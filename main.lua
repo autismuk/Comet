@@ -27,6 +27,14 @@ function Comet:initialise()
 	self.cm_entities = {} 																					-- entities (id/name => entity data)
 end 
 
+--//	Destroy *all* entities and components.
+
+function Comet:destroyAll()
+	for _,ref in pairs(self.cm_entities) do self:removeEntity(ref) end 										-- remove all entities.
+	self.cm_nextComponentID = nil self.cm_nextEntityID = nil 												-- and erase members
+	self.cm_components = nil self.cm_entities = nil
+end 
+
 --//	Helper method which converts a comma seperated string into an array of strings. Same as split() in Python.
 --//	@csString 	[string]			string seperated by commas.
 --//	@return 	[table]				array of those strings.
@@ -167,7 +175,7 @@ function Comet:insertComponentByRef(entity,component,...)
 end 
 
 --//	Remove an entity permanently. leaves data members unaffected.
---//	@entity [entity]	Entity to remove.
+--//	@entity [entity]	Entity to remove (by reference)
 
 function Comet:removeEntity(entity)
 	local owner = entity.en_owner 																			-- this is the comet instance.
@@ -180,8 +188,8 @@ function Comet:removeEntity(entity)
 	entity.en_components = nil entity.en_eID = nil entity.en_owner = nil 									-- remove other data.
 end 
 
---//	Remove a component.
---//	@entity 	[entity reference]		entity to insert component(s) into
+--//	Remove a compenent or components from an entity
+--//	@entity 	[entity reference]		entity to remove from.
 --//	@cList 		[string/table]			string or table or comma list of components that are going.
 --//	@return 	[entity]				chaining.
 
@@ -199,6 +207,7 @@ function Comet:removeComponent(entity,cList)
 	return entity
 end
 
+--//	Remove a component from an entity by reference.
 --//	@entity 	[entity reference]		entity to remove component from
 --//	@component 	[string/table]			string, comma seperated items, or table of strings.
 
@@ -211,6 +220,59 @@ function Comet:removeComponentByReference(entity,component)
 	if component.cm_destructor ~= nil then 																	-- does this component have a destructor
 		component.cm_destructor(entity) 																	-- then call it.
 	end
+end 
+
+--//	Convert a query to a list of required components. A query is a list of components that is required to be present.
+--//	@componentList [string/table]		component name, table of names, comma seperated lists.
+--//	@return 	   [table] 				array of component references.
+
+function Comet:createQuery(componentList)
+	if type(componentList) == "string" then  																-- convert a string to an array of strings.
+		componentList = self:split(componentList)
+	end
+	local query = {} 																						-- this is the resulting query.
+	for i = 1,#componentList do 																			-- work through the array
+		query[i] = self:getComponentByName(componentList[i])												-- convert component names to component references.
+	end 
+	return query
+end
+
+--//	Optimise a query by sorting the components so the components most used are at the end. 
+--//	@query 	[table]		query
+--//	@return [table]		optimised query
+
+function Comet:optimiseQuery(query)
+	if #query > 1 then 																						-- if there are at least two lists.
+		table.sort(query,function(a,b) return a.cm_entityCount < b.cm_entityCount end) 						-- sort so the component with the lowest entity count is first.
+	end 
+	return query
+end 
+
+--//	Execute a query. This does two things - if a method is provided it calls method(entity). If an objectList is provided
+--//	it adds the entity address to that object list, thus maintaing a list of such. So it can be used for executing 
+--//	methods or querying the entity database.
+
+--//	@query 	[table]		query, which may have been optimised, table of component references
+--//	@method [function]	a method to be called on all successful matches (optional)
+--//	@objectList [table]	a table which can contain all matching entities (optional)
+
+function Comet:runQuery(query,method,objectList) 
+	for _,eid in pairs(query[1].cm_entities) do  															-- work through all entities in the first component.
+		local success = true 																				-- this flag tracks success/failure of the match.
+		local testNumber = 2 																				-- start by checking 2
+		while success and testNumber <= #query do 															-- while still okay, and not checked all components.
+			if query[2].cm_entities[eid] == nil then success = false end 									-- fail if the entity is not in that component's list.
+			testNumber = testNumber + 1 																	-- go to the next test.
+		end
+		if success then 																					-- did it match ?
+			if objectList ~= nil then objectList[#objectList+1] = self.cm_entities[eid] end  				-- if list provided add entity to list.
+			if method ~= nil then method(self.cm_entities[eid]) end 										-- if method provided call with entity
+		end
+	end
+	return objectList
+end 
+
+function Comet:newS(componentList,options)
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -227,13 +289,15 @@ local c3 = c:newC("sprite","",{ requires = "position,size,coronaobject",
 
 local e1 = c:newE()
 e1:addC("sprite","crab.png",42)
-e1.displayObj.x = 200
---e1:remC({"size","position","coronaobject"})
+e1.displayObj.x,e1.displayObj.y = 160,240
 
 local e2 = c:newE({"position","size","coronaobject"})
 e2:addC("sprite","cat.jpg",44)
---e2:remC("sprite")
+e2.displayObj.x,e2.displayObj.y = 60,100
 
-e1:remove()
-e2:remove()
-for k,v in pairs(e1) do print(k,v) end
+local e3 = c:newE("position,size")
+local e4 = c:newE("size")
+
+local q = c:optimiseQuery(c:createQuery("size,position,coronaobject"))
+local l = c:runQuery(q,function(e) print(e.en_eID) end,{})
+print(#l)
