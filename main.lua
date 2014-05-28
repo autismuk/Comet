@@ -271,7 +271,7 @@ function Comet:runQuery(query,method,objectList)
 		local success = true 																				-- this flag tracks success/failure of the match.
 		local testNumber = 2 																				-- start by checking 2
 		while success and testNumber <= #query do 															-- while still okay, and not checked all components.
-			if query[2].cm_entities[eid] == nil then success = false end 									-- fail if the entity is not in that component's list.
+			if query[testNumber].cm_entities[eid] == nil then success = false end 							-- fail if the entity is not in that component's list.
 			testNumber = testNumber + 1 																	-- go to the next test.
 		end
 		if success then 																					-- did it match ?

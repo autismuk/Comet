@@ -8,14 +8,14 @@
 ---
 --- ************************************************************************************************************************************************************************
 
+math.randomseed(57)
+
 local comet = Comet:new()
 
-print(comet)
-
 local componentCount = 50
-local entityCount = 100 
-local queryCount = 20
-local querySizeMax = 8
+local entityCount = 100
+local queryCount = 100
+local querySizeMax = 4
 
 local compName = {}																						-- a list of component names.
 local entity = {} 																						-- list of entities.
@@ -60,10 +60,28 @@ function validateEntityList(textList,compList)
 	end 
 end 
 
+function checkQuery(query,entity) 
+	for _,cCheck in ipairs(query) do 																	-- for each component in the query.
+		if entity.en_components[cCheck.cm_cID] == nil then return false end
+	end
+	return true
+end 
+
+function validateQueryResult(query,result)
+	query = comet:split(query) 																			-- convert query to an array of strings.
+	for i = 1,#query do query[i] = comet:getComponentByName(query[i]) end 								-- convert to component references.	
+	local success = {} 																					-- make a hash where key is the successful entity ref.
+	for _,entity in ipairs(result) do success[entity] = entity end 										-- success if in hash, fail otherwise.
+	for _,entity in ipairs(entity) do 																	-- now check each entity manually.
+		local pass = checkQuery(query,entity) 															-- check the query result.
+		assert(pass == (success[entity] ~= nil)) 														-- if successful should be there, not otherwise.
+	end 
+end
+
 print("Start")
 
-for testCount = 1,100*100 do
-	if testCount % 100 == 0 then print(testCount) end
+for testCount = 1,100 do
+	if testCount % 1 == 0 then print(testCount) end
 
 	for chg = 1,3 do 																					-- changing components.
 		local comp = compName[math.random(1,componentCount)] 											-- this is the component we are adding and removing.
@@ -87,18 +105,21 @@ for testCount = 1,100*100 do
 	end
 	
 	for i = 1,entityCount do  																			-- check the entity components match.
+		entity[i].myID = i
 		validateEntityList(entityData[i],entity[i].en_components)
 	end 
 
 	for i = 1,queryCount do  																			-- check all the query results are still valid
-		if math.random(1,100) == 1 then queries[i] = nil end 											-- occasionally, have a new query
+		--if math.random(1,100) == 1 then queries[i] = nil end 											-- occasionally, have a new query
 		if queries[i] == nil then  																		-- create it if it doesn't exist
-			queries[i] = makeList(math.random(1,querySizeMax))
+			queries[i] = makeList(2)
 		end 
 		local result = comet:query(queries[i]) 															-- run the query
+		validateQueryResult(queries[i],result) 															-- check it matches.
 	end
 end 
-print("Done")
 print(comet.cm_cacheInfo.hits," of ",comet.cm_cacheInfo.total)
 print(math.floor(100*comet.cm_cacheInfo.hits/comet.cm_cacheInfo.total).."% cache success")
+
 comet:destroyAll()
+print("Done")
