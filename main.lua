@@ -1,12 +1,12 @@
---- ************************************************************************************************************************************************************************
----
----				Name : 		main.lua
----				Purpose :	COMET (Component/Entity Framework for Corona/Lua)
----				Created:	27 May 2014
----				Author:		Paul Robson (paul@robsons.org.uk)
----				License:	MIT
----
---- ************************************************************************************************************************************************************************
+	--- ************************************************************************************************************************************************************************
+	---
+	---				Name : 		main.lua
+	---				Purpose :	COMET (Component/Entity Framework for Corona/Lua)
+	---				Created:	27 May 2014
+	---				Author:		Paul Robson (paul@robsons.org.uk)
+	---				License:	MIT
+	---
+	--- ************************************************************************************************************************************************************************
 
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
@@ -28,6 +28,9 @@ function Comet:initialise()
 	self.cm_nextEntityID = 20000 																			-- next entity number
 	self.cm_entities = {} 																					-- entities (id/name => entity data)
 
+	self.cm_queryCache = {} 																				-- cache of query results.
+
+	self.cm_cacheInfo = { hits = 0, total = 0 } 															-- track success of query cache.
 end 
 
 --//	Destroy *all* entities and components.
@@ -35,7 +38,8 @@ end
 function Comet:destroyAll()
 	for _,ref in pairs(self.cm_entities) do self:removeEntity(ref) end 										-- remove all entities.
 	self.cm_nextComponentID = nil self.cm_nextEntityID = nil 												-- and erase members
-	self.cm_components = nil self.cm_entities = nil
+	self.cm_components = nil self.cm_entities = nil self.cm_queryCache = nil 					
+	self.cm_cacheInfo = nil
 end 
 
 --//	Helper method which converts a comma seperated string into an array of strings. Same as split() in Python.
@@ -278,16 +282,75 @@ function Comet:runQuery(query,method,objectList)
 	return objectList
 end 
 
+--//	Create a query key which is unique for each query
+--//	@query 	[table]			Table of component references (note this is sorted by this method.)
+--//	@return [string]		Unique key for query.
+
+function Comet:createQueryKey(query)
+	table.sort(query,function(a,b) return a.cm_cID < b.cm_cID end) 											-- sort the table on component id
+	local key = "" 																							-- build a composite key out of the ids
+	for _,compRef in ipairs(query) do key = key .. compRef.cm_cID end 										-- no separator because IDs are 10000 and up
+	return key 																								-- return it.
+end 
+
+--//	Run a query as an AND selection of components. Uses cached query if available and valid.
+--//	@queryDef [string/table]		component name, table of names, comma seperated lists.
+--//	@return 	[table]			array of matching entities
+
+function Comet:query(queryDef)
+	local query = self:createQuery(queryDef) 																-- convert into table of component refs.
+	local queryKey = self:createQueryKey(query) 															-- get the key
+	return self:queryInternal(queryKey,query) 																-- run the query.
+end 
+
+--//	Check the cache of queries and validate it, if ok then use it if not run the query.
+--//	@queryKey 	[string]		key of query
+--//	@query 		[table]			table of component references.
+--//	@return 	[table]			array of matching entities
+
+function Comet:queryInternal(queryKey,query)
+	self.cm_cacheInfo.total = self.cm_cacheInfo.total + 1 	
+	if self.cm_queryCache[queryKey] ~= nil then 															-- is there a cached query ?
+		local badComponents = {} 																			-- want to make a list of all invalid components
+		for compRef,_ in pairs(self.cm_queryCache[queryKey].keys) do 										-- check all the components in this query.
+			if not compRef.cm_indexValid then badComponents[#badComponents+1] = compRef end 				-- if the component is invalid add to the list.
+		end 																								
+		if #badComponents > 0 then 																			-- one of them was bad.
+			for ref,cache in pairs(self.cm_queryCache) do 													-- go through all the cached queries
+				for _,comp in ipairs(badComponents) do 														-- and for each of the bad components
+					if cache.keys[comp] ~= nil then 														-- if that key is in the cached index
+						self.cm_queryCache[ref] = nil 														-- remove it.
+					end 
+				end 
+			end
+		else  																								-- all the indexes were okay.
+			self.cm_cacheInfo.hits = self.cm_cacheInfo.hits + 1
+			return self.cm_queryCache[queryKey].entities 													-- so this query result is still valid.
+		end 
+	end
+
+	query = self:optimiseQuery(query) 																		-- optimise the queery.
+	local entities = self:runQuery(query,nil,{})															-- run the query and store the results.
+	self.cm_queryCache[queryKey] = { keys = {}, entities = entities } 										-- put the query result in the cache
+	for _,compRef in ipairs(query) do 
+		compRef.cm_indexValid = true 								 										-- all those keys are now valid.
+		self.cm_queryCache[queryKey].keys[compRef] = true 													-- add to the key hash in the cache
+	end
+	return entities
+end
+
 function Comet:newS(componentList,options)
 end 
 
 
--- internal cached query design
 -- add systems with update/preProcess/postProcess methods.
 -- members should not be duplicates (or warn !)
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
+
+_G.Comet = Comet require("bully")
+--[[
 
 local c = Comet:new()
 
@@ -309,7 +372,18 @@ e2.displayObj.x,e2.displayObj.y = 60,100
 local e3 = c:newE("position,size")
 local e4 = c:newE("size")
 
-local q = c:optimiseQuery(c:createQuery("size,position,coronaobject"))
-local l = c:runQuery(q,function(e) print(e.en_eID) end,{})
-print(#l)
+print("No 1")
+q = c:query("size,position,coronaobject")
+print(#q)
+q = c:query("size,position,coronaobject")
+print(#q)
+e4:addC("coronaobject,position")
+q = c:query("size,position,coronaobject")
+print(#q)
+for k,v in ipairs(q) do print(k,v.en_eID) end
 
+-- print("No 2")
+-- q2 = c:query("size")
+-- for k,v in ipairs(q2) do print(k,v.en_eID) end
+
+--]]
