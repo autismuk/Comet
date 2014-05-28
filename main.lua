@@ -21,10 +21,13 @@ local Comet = Base:new()
 --// 	Constructor. Initialises the list of components and entities, and the next IDs.
 
 function Comet:initialise() 
+
 	self.cm_nextComponentID = 10000 																		-- next component number
 	self.cm_components = {} 																				-- components (id/name => component data)
+
 	self.cm_nextEntityID = 20000 																			-- next entity number
 	self.cm_entities = {} 																					-- entities (id/name => entity data)
+
 end 
 
 --//	Destroy *all* entities and components.
@@ -73,6 +76,7 @@ function Comet:newC(name,members,cInfo)
 	comp.cm_constructor = cInfo.constructor 																-- clear up and create methods, so you can have a component that is a sprite. 
 	comp.cm_destructor = cInfo.destructor 
 	comp.cm_requires = cInfo.requires or {}  																-- get list of required components.
+	comp.cm_indexValid = false 																				-- set to false whenever component added/removed
 
 	if type(comp.cm_requires) == "string" then  															-- if string list 
 		comp.cm_requires = self:split(comp.cm_requires) 													-- convert to an array of strings
@@ -164,6 +168,7 @@ function Comet:insertComponentByRef(entity,component,...)
 	assert(component.cm_entities[entity.en_eID] == nil) 													-- check the tables match up.
 	component.cm_entities[entity.en_eID] = entity.en_eID 													-- put the entity in the component's table for that entity
 	component.cm_entityCount = component.cm_entityCount + 1 												-- bump the component count.
+	component.cm_indexValid = false 																		-- indexes with this component are now invalid
 
 	for _,members in ipairs(component.cm_members) do 														-- give the members default values.
 		entity[members.name] = entity[members.name] or members.default
@@ -217,6 +222,7 @@ function Comet:removeComponentByReference(entity,component)
 	entity.en_components[component.cm_cID] = nil 															-- then remove them, entity no longer has this component
 	component.cm_entities[entity.en_eID] = nil 																-- this component no longer used by this entity
 	component.cm_entityCount = component.cm_entityCount - 1 												-- decrement the count
+	component.cm_indexValid = false 																		-- indexes with this component are now invalid
 	if component.cm_destructor ~= nil then 																	-- does this component have a destructor
 		component.cm_destructor(entity) 																	-- then call it.
 	end
@@ -266,7 +272,7 @@ function Comet:runQuery(query,method,objectList)
 		end
 		if success then 																					-- did it match ?
 			if objectList ~= nil then objectList[#objectList+1] = self.cm_entities[eid] end  				-- if list provided add entity to list.
-			if method ~= nil then method(self.cm_entities[eid]) end 										-- if method provided call with entity
+			if method ~= nil then method(self.cm_entities[eid],self) end 									-- if method provided call with entity
 		end
 	end
 	return objectList
@@ -274,6 +280,11 @@ end
 
 function Comet:newS(componentList,options)
 end 
+
+
+-- internal cached query design
+-- add systems with update/preProcess/postProcess methods.
+-- members should not be duplicates (or warn !)
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
@@ -301,3 +312,4 @@ local e4 = c:newE("size")
 local q = c:optimiseQuery(c:createQuery("size,position,coronaobject"))
 local l = c:runQuery(q,function(e) print(e.en_eID) end,{})
 print(#l)
+
