@@ -29,7 +29,7 @@ function Comet:initialise()
 	self.cm_entities = {} 																					-- entities (id/name => entity data)
 
 	self.cm_queryCache = {} 																				-- cache of query results.
-
+	self.cm_invalidComponents = nil 																		-- component refs added/removed from entities
 	self.cm_cacheInfo = { hits = 0, total = 0 } 															-- track success of query cache.
 end 
 
@@ -39,7 +39,7 @@ function Comet:destroyAll()
 	for _,ref in pairs(self.cm_entities) do self:removeEntity(ref) end 										-- remove all entities.
 	self.cm_nextComponentID = nil self.cm_nextEntityID = nil 												-- and erase members
 	self.cm_components = nil self.cm_entities = nil self.cm_queryCache = nil 					
-	self.cm_cacheInfo = nil
+	self.cm_cacheInfo = nil self.cm_invalidComponents = nil
 end 
 
 --//	Helper method which converts a comma seperated string into an array of strings. Same as split() in Python.
@@ -80,7 +80,6 @@ function Comet:newC(name,members,cInfo)
 	comp.cm_constructor = cInfo.constructor 																-- clear up and create methods, so you can have a component that is a sprite. 
 	comp.cm_destructor = cInfo.destructor 
 	comp.cm_requires = cInfo.requires or {}  																-- get list of required components.
-	comp.cm_indexValid = false 																				-- set to false whenever component added/removed
 
 	if type(comp.cm_requires) == "string" then  															-- if string list 
 		comp.cm_requires = self:split(comp.cm_requires) 													-- convert to an array of strings
@@ -172,7 +171,8 @@ function Comet:insertComponentByRef(entity,component,...)
 	assert(component.cm_entities[entity.en_eID] == nil) 													-- check the tables match up.
 	component.cm_entities[entity.en_eID] = entity.en_eID 													-- put the entity in the component's table for that entity
 	component.cm_entityCount = component.cm_entityCount + 1 												-- bump the component count.
-	component.cm_indexValid = false 																		-- indexes with this component are now invalid
+	self.cm_invalidComponents = self.cm_invalidComponents or {} 											-- instantiate invalid list if required
+	self.cm_invalidComponents[component] = true 															-- any index with this component in is now invalid
 
 	for _,members in ipairs(component.cm_members) do 														-- give the members default values.
 		entity[members.name] = entity[members.name] or members.default
@@ -226,7 +226,8 @@ function Comet:removeComponentByReference(entity,component)
 	entity.en_components[component.cm_cID] = nil 															-- then remove them, entity no longer has this component
 	component.cm_entities[entity.en_eID] = nil 																-- this component no longer used by this entity
 	component.cm_entityCount = component.cm_entityCount - 1 												-- decrement the count
-	component.cm_indexValid = false 																		-- indexes with this component are now invalid
+	self.cm_invalidComponents = self.cm_invalidComponents or {} 											-- instantiate invalid list if required
+	self.cm_invalidComponents[component] = true 															-- any index with this component in is now invalid
 	if component.cm_destructor ~= nil then 																	-- does this component have a destructor
 		component.cm_destructor(entity) 																	-- then call it.
 	end
@@ -309,42 +310,46 @@ end
 --//	@return 	[table]			array of matching entities
 
 function Comet:queryInternal(queryKey,query)
-	self.cm_cacheInfo.total = self.cm_cacheInfo.total + 1 	
-	if self.cm_queryCache[queryKey] ~= nil then 															-- is there a cached query ?
-		local badComponents = {} 																			-- want to make a list of all invalid components
-		for compRef,_ in pairs(self.cm_queryCache[queryKey].keys) do 										-- check all the components in this query.
-			if not compRef.cm_indexValid then badComponents[#badComponents+1] = compRef end 				-- if the component is invalid add to the list.
-		end 																								
-		if #badComponents > 0 then 																			-- one of them was bad.
-			for ref,cache in pairs(self.cm_queryCache) do 													-- go through all the cached queries
-				for _,comp in ipairs(badComponents) do 														-- and for each of the bad components
-					if cache.keys[comp] ~= nil then 														-- if that key is in the cached index
-						self.cm_queryCache[ref] = nil 														-- remove it.
-					end 
+
+	if self.cm_invalidComponents ~= nil then  																-- are there invalid components ?
+		for key,cacheEntry in pairs(self.cm_queryCache) do 													-- work through all the cached entries
+			for _,compRef in ipairs(cacheEntry.components) do 												-- scan each entry's components
+				if self.cm_invalidComponents[compRef] ~= nil then 											-- if it is in the invalid list
+					self.cm_queryCache[key] = nil 															-- clear that cache entry.
 				end 
 			end
-		else  																								-- all the indexes were okay.
-			self.cm_cacheInfo.hits = self.cm_cacheInfo.hits + 1
-			return self.cm_queryCache[queryKey].entities 													-- so this query result is still valid.
-		end 
+		end
+		self.cm_invalidComponents = nil  																	-- clear the invalid components list.
 	end
+	self.cm_cacheInfo.total = self.cm_cacheInfo.total + 1 	
 
-	query = self:optimiseQuery(query) 																		-- optimise the queery.
+	if self.cm_queryCache[queryKey] ~= nil then  															-- is there a valid cache entry.
+		self.cm_cacheInfo.hits = self.cm_cacheInfo.hits + 1 												-- increment the successful hit count.
+		return self.cm_queryCache[queryKey].result 															-- return the result part.
+	end 
+
+	query = self:optimiseQuery(query) 																		-- optimise the query.
 	local entities = self:runQuery(query,nil,{})															-- run the query and store the results.
-	self.cm_queryCache[queryKey] = { keys = {}, entities = entities } 										-- put the query result in the cache
-	for _,compRef in ipairs(query) do 
-		compRef.cm_indexValid = true 								 										-- all those keys are now valid.
-		self.cm_queryCache[queryKey].keys[compRef] = true 													-- add to the key hash in the cache
-	end
+
+	local newCache = { components = {}, result = entities }													-- create a new cache entry.
+	for _,compRef in ipairs(query) do newCache.components[#newCache.components+1] = compRef end 			-- copy used components into it.
+	self.cm_queryCache[queryKey] = newCache 																-- put in the results cache.
 	return entities
 end
 
-function Comet:newS(componentList,options)
+--//	Create a new system. preProcess and postProcess take a list of entities (from the query). update takes the entity reference
+--//	and a reference to the Comet instance.
+--//
+--//	@componentList 	[table/string]		List of components, component names, comma seperated variables.
+--//	@updateMethod 	[function/class]	Function called, or if a table, call table:update() [and table:preProcess/postProcess]
+--//	@options 		[table] 			preprocess = <function> postprocess = <function>
+
+function Comet:newS(componentList,updateMethod,options)
 end 
 
-
 -- add systems with update/preProcess/postProcess methods.
--- members should not be duplicates (or warn !)
+-- members should not be duplicates (or warn !) ?
+-- only execute entities with an eID value - entities may have been deleted for some reason.
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************

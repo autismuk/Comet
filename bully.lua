@@ -12,10 +12,10 @@ math.randomseed(57)
 
 local comet = Comet:new()
 
-local componentCount = 50
-local entityCount = 100
+local componentCount = 90
+local entityCount = 300
 local queryCount = 100
-local querySizeMax = 4
+local querySizeMax = 8
 
 local compName = {}																						-- a list of component names.
 local entity = {} 																						-- list of entities.
@@ -80,8 +80,9 @@ end
 
 print("Start")
 
-for testCount = 1,100 do
-	if testCount % 1 == 0 then print(testCount) end
+for testCount = 1,1000*60*60 do
+
+	if testCount % 100 == 0 then print(testCount) end
 
 	for chg = 1,3 do 																					-- changing components.
 		local comp = compName[math.random(1,componentCount)] 											-- this is the component we are adding and removing.
@@ -110,9 +111,9 @@ for testCount = 1,100 do
 	end 
 
 	for i = 1,queryCount do  																			-- check all the query results are still valid
-		--if math.random(1,100) == 1 then queries[i] = nil end 											-- occasionally, have a new query
+		if math.random(1,100) == 1 then queries[i] = nil end 											-- occasionally, have a new query
 		if queries[i] == nil then  																		-- create it if it doesn't exist
-			queries[i] = makeList(2)
+			queries[i] = makeList(math.random(1,querySizeMax))
 		end 
 		local result = comet:query(queries[i]) 															-- run the query
 		validateQueryResult(queries[i],result) 															-- check it matches.
@@ -120,6 +121,6 @@ for testCount = 1,100 do
 end 
 print(comet.cm_cacheInfo.hits," of ",comet.cm_cacheInfo.total)
 print(math.floor(100*comet.cm_cacheInfo.hits/comet.cm_cacheInfo.total).."% cache success")
-
+--c = 0 for _,p in pairs(comet.cm_invalidComponents) do c = c + 1 end print("Invalid",c)
 comet:destroyAll()
 print("Done")
