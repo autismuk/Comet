@@ -41,7 +41,7 @@ function makeList(n)  																					-- create a list of n unique componen
 	return result:sub(1,-2) 
 end 
 
-for i = 1,entityCount do 
+for i = 1,entityCount do 																				-- create some entities, track whats in them
 	entityData[i] = makeList(math.random(1,math.floor(componentCount/4)))
 	entity[i] = comet:newE(entityData[i])
 end
@@ -62,9 +62,9 @@ end
 
 function checkQuery(query,entity) 
 	for _,cCheck in ipairs(query) do 																	-- for each component in the query.
-		if entity.en_components[cCheck.cm_cID] == nil then return false end
+		if entity.en_components[cCheck.cm_cID] == nil then return false end 							-- if it is not in the entity, fail.
 	end
-	return true
+	return true 																						-- all are present.
 end 
 
 function validateQueryResult(query,result)

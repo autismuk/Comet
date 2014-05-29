@@ -70,6 +70,7 @@ function Comet:newC(name,members,cInfo)
 	name = name:lower() 																					-- case independent
 	assert(self.cm_components[name] == nil,"Duplicate named component") 									-- check only one.
 	cInfo = cInfo or {} 																					-- if nothing provided.
+
 	local comp = { } 																						-- build a component table.
 	comp.cm_cID = self.cm_nextComponentID 																	-- component ID.
 	comp.cm_name = name 																					-- name 
@@ -109,7 +110,7 @@ end
 
 Comet.defaultTypeValues = { int = 0, number = 0, table = nil, string = "", object = nil,boolean = false }	-- default type values.
 
---//	Find a component, throw an error if it does not exist
+--//%	Find a component, throw an error if it does not exist
 --//	@name 	[string] 		Name of component
 --//	@return [table] 		Reference of component table.
 
@@ -120,7 +121,8 @@ function Comet:getComponentByName(name)
 	return self.cm_components[name]
 end 
 
---//	Define a new entity.
+--//	Define a new entity, with n optional list of components.  Components added this way (or any way in a group) cannot have paremeterised
+--//	constructors. The entity object has three methods addC() remC() and remove(), buf if is not a class in its own right. 
 --//	@cList 	[string] 		List of components, optional. Saves addC() calls.
 --//	@return [entity]		reference to entity
 
@@ -138,7 +140,7 @@ function Comet:newE(cList)
 	return ent
 end 
 
---//	Insert a new component or components. If the entity is a comma list or a table the constructor parameters are not available
+--//%	Insert a new component or components. If the entity is a comma list or a table the constructor parameters are not available
 --//	as there is no way of identifying which constructor. 
 --//	@entity 	[entity reference]		entity to insert component(s) into
 --//	@cList 		[string/table]			string, comma seperated items, or table of strings.
@@ -158,7 +160,7 @@ function Comet:insertComponent(entity,cList,...)
 	return entity
 end 
 
---//	Insert a single entity by reference.
+--//%	Insert a single entity by reference.
 --//	@entity 	[entity reference]		entity to insert component(s) into
 
 function Comet:insertComponentByRef(entity,component,...)
@@ -183,10 +185,12 @@ function Comet:insertComponentByRef(entity,component,...)
 	end 
 end 
 
---//	Remove an entity permanently. leaves data members unaffected.
+--//%	Remove an entity permanently. leaves data members unaffected.
 --//	@entity [entity]	Entity to remove (by reference)
 
 function Comet:removeEntity(entity)
+	assert(entity ~= nil,"No entity parameter")
+	if entity.en_eID == nil then return end																	-- entity already removed, exit.
 	local owner = entity.en_owner 																			-- this is the comet instance.
 	for _,compRef in pairs(entity.en_components) do  														-- scan through all the components
 		owner:removeComponentByReference(entity,compRef) 													-- and remove them.
@@ -197,7 +201,7 @@ function Comet:removeEntity(entity)
 	entity.en_components = nil entity.en_eID = nil entity.en_owner = nil 									-- remove other data.
 end 
 
---//	Remove a compenent or components from an entity
+--//%	Remove a compenent or components from an entity
 --//	@entity 	[entity reference]		entity to remove from.
 --//	@cList 		[string/table]			string or table or comma list of components that are going.
 --//	@return 	[entity]				chaining.
@@ -216,7 +220,7 @@ function Comet:removeComponent(entity,cList)
 	return entity
 end
 
---//	Remove a component from an entity by reference.
+--//%	Remove a component from an entity by reference.
 --//	@entity 	[entity reference]		entity to remove component from
 --//	@component 	[string/table]			string, comma seperated items, or table of strings.
 
@@ -233,7 +237,7 @@ function Comet:removeComponentByReference(entity,component)
 	end
 end 
 
---//	Convert a query to a list of required components. A query is a list of components that is required to be present.
+--//%	Convert a query to a list of required components. A query is a list of components that is required to be present.
 --//	@componentList [string/table]		component name, table of names, comma seperated lists.
 --//	@return 	   [table] 				array of component references.
 
@@ -248,7 +252,7 @@ function Comet:createQuery(componentList)
 	return query
 end
 
---//	Optimise a query by sorting the components so the components most used are at the end. 
+--//%	Optimise a query by sorting the components so the components most used are at the end. 
 --//	@query 	[table]		query
 --//	@return [table]		optimised query
 
@@ -259,7 +263,7 @@ function Comet:optimiseQuery(query)
 	return query
 end 
 
---//	Execute a query. This does two things - if a method is provided it calls method(entity). If an objectList is provided
+--//%	Execute a query. This does two things - if a method is provided it calls method(entity). If an objectList is provided
 --//	it adds the entity address to that object list, thus maintaing a list of such. So it can be used for executing 
 --//	methods or querying the entity database.
 
@@ -283,7 +287,7 @@ function Comet:runQuery(query,method,objectList)
 	return objectList
 end 
 
---//	Create a query key which is unique for each query
+--//%	Create a query key which is unique for each query
 --//	@query 	[table]			Table of component references (note this is sorted by this method.)
 --//	@return [string]		Unique key for query.
 
@@ -294,17 +298,19 @@ function Comet:createQueryKey(query)
 	return key 																								-- return it.
 end 
 
---//	Run a query as an AND selection of components. Uses cached query if available and valid.
+--//	Run a query as an AND selection of components. Uses cached query if available and valid. Cached queries are invalidated if their
+--//	component list contains a component that has recently been added to or removed from an entity.
 --//	@queryDef [string/table]		component name, table of names, comma seperated lists.
 --//	@return 	[table]			array of matching entities
 
 function Comet:query(queryDef)
+	assert(queryDef ~= nil,"No query provided")
 	local query = self:createQuery(queryDef) 																-- convert into table of component refs.
 	local queryKey = self:createQueryKey(query) 															-- get the key
 	return self:queryInternal(queryKey,query) 																-- run the query.
 end 
 
---//	Check the cache of queries and validate it, if ok then use it if not run the query.
+--//%	Check the cache of queries and validate it, if ok then use it if not run the query.
 --//	@queryKey 	[string]		key of query
 --//	@query 		[table]			table of component references.
 --//	@return 	[table]			array of matching entities
@@ -350,12 +356,10 @@ end
 -- add systems with update/preProcess/postProcess methods.
 -- members should not be duplicates (or warn !) ?
 -- only execute entities with an eID value - entities may have been deleted for some reason.
+-- .format on members,
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
-
-_G.Comet = Comet require("bully")
---[[
 
 local c = Comet:new()
 
@@ -376,6 +380,7 @@ e2.displayObj.x,e2.displayObj.y = 60,100
 
 local e3 = c:newE("position,size")
 local e4 = c:newE("size")
+local e5 = c:newE()
 
 print("No 1")
 q = c:query("size,position,coronaobject")
@@ -387,8 +392,3 @@ q = c:query("size,position,coronaobject")
 print(#q)
 for k,v in ipairs(q) do print(k,v.en_eID) end
 
--- print("No 2")
--- q2 = c:query("size")
--- for k,v in ipairs(q2) do print(k,v.en_eID) end
-
---]]
