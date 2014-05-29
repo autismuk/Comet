@@ -1,12 +1,12 @@
-	--- ************************************************************************************************************************************************************************
-	---
-	---				Name : 		main.lua
-	---				Purpose :	COMET (Component/Entity Framework for Corona/Lua)
-	---				Created:	27 May 2014
-	---				Author:		Paul Robson (paul@robsons.org.uk)
-	---				License:	MIT
-	---
-	--- ************************************************************************************************************************************************************************
+--- ************************************************************************************************************************************************************************
+---
+---				Name : 		comet.lua
+---				Purpose :	COMET (Component/Entity Framework for Corona/Lua)
+---				Created:	27 May 2014
+---				Author:		Paul Robson (paul@robsons.org.uk)
+---				License:	MIT
+---
+--- ************************************************************************************************************************************************************************
 
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
@@ -27,6 +27,8 @@ function Comet:initialise()
 
 	self.cm_nextEntityID = 20000 																			-- next entity number
 	self.cm_entities = {} 																					-- entities (id/name => entity data)
+
+	self.cm_systems = {} 																					-- list of systems.
 
 	self.cm_queryCache = {} 																				-- cache of query results.
 	self.cm_invalidComponents = nil 																		-- component refs added/removed from entities
@@ -245,6 +247,7 @@ function Comet:createQuery(componentList)
 	if type(componentList) == "string" then  																-- convert a string to an array of strings.
 		componentList = self:split(componentList)
 	end
+	if type(componentList[1]) == "table" then return componentList end 										-- already converted to object list.
 	local query = {} 																						-- this is the resulting query.
 	for i = 1,#componentList do 																			-- work through the array
 		query[i] = self:getComponentByName(componentList[i])												-- convert component names to component references.
@@ -351,44 +354,49 @@ end
 --//	@options 		[table] 			preprocess = <function> postprocess = <function>
 
 function Comet:newS(componentList,updateMethod,options)
+	assert(componentList ~= nil and componentList ~= "","No component list provided") 						-- must provide components to be system for.
+	assert(updateMethod ~= nil,"No update method") 		
+	local system = options or {} 																			-- start with the system options.
+	system.updateMethod = updateMethod 																		-- store the update method.
+	system.query = self:createQuery(componentList)															-- preconvert it.
+	assert(#system.query > 0,"Empty component list for System query") 										-- must have at least something in it.
+	self.cm_systems[#self.cm_systems+1] = system 															-- store in the systems table.
+
+	return self:query(system.query)
 end 
 
--- add systems with update/preProcess/postProcess methods.
+function Comet:process()
+	for _,system in ipairs(self.cm_systems) do self:runSystem(system) end 									-- run all systems.
+end
+
+function Comet:runSystem(system)
+	local result = self:query(system.query)																	-- perform the query
+	if #result == 0 then return end 																		-- there are no matching entities.
+
+	if system.preprocess ~= nil then 																		-- preprocess method provided 
+		system.preprocess(result)
+	elseif type(system.updateMethod) == "table" and system.updateMethod.preprocess ~= nil then 				-- or call it as a class.
+		system.updateMethod:preprocess(result)
+	end
+
+	for _,entity in ipairs(result) do 																		-- work through all entities in system
+		if type(system.updateMethod) == "function" then 													-- is it a function ?
+			system.updateMethod(entity,self) 																-- call it.
+		else 
+			system.updateMethod:update(entity,self) 														-- else call it as a method 
+		end
+	end
+
+	if system.postprocess ~= nil then 																		-- postprocess method provided 
+		system.postprocess(result)
+	elseif type(system.updateMethod) == "table" and system.updateMethod.postprocess ~= nil then 			-- or call it as a class.
+		system.updateMethod:postprocess(result)
+	end
+end 
+
+return Comet
+
 -- members should not be duplicates (or warn !) ?
 -- only execute entities with an eID value - entities may have been deleted for some reason.
 -- .format on members,
-
---- ************************************************************************************************************************************************************************
---- ************************************************************************************************************************************************************************
-
-local c = Comet:new()
-
-local c1 = c:newC("position","x:int,y:int")
-local c2 = c:newC("size","width:number,height:number")
-local c4 = c:newC("coronaobject","displayObj:object")
-local c3 = c:newC("sprite","",{ requires = "position,size,coronaobject",
-								constructor = function(entity,fileName,size) entity.displayObj = display.newImage(fileName) end,
-								destructor = function(entity) entity.displayObj:removeSelf() entity.displayObj = nil end })
-
-local e1 = c:newE()
-e1:addC("sprite","crab.png",42)
-e1.displayObj.x,e1.displayObj.y = 160,240
-
-local e2 = c:newE({"position","size","coronaobject"})
-e2:addC("sprite","cat.jpg",44)
-e2.displayObj.x,e2.displayObj.y = 60,100
-
-local e3 = c:newE("position,size")
-local e4 = c:newE("size")
-local e5 = c:newE()
-
-print("No 1")
-q = c:query("size,position,coronaobject")
-print(#q)
-q = c:query("size,position,coronaobject")
-print(#q)
-e4:addC("coronaobject,position")
-q = c:query("size,position,coronaobject")
-print(#q)
-for k,v in ipairs(q) do print(k,v.en_eID) end
-
+-- allow markers ?
