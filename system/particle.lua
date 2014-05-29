@@ -52,7 +52,7 @@ end
 
 Emitter.remove = Emitter.removeSelf
 
---//	Load a parameter file
+--//%	Load a parameter file
 
 function Emitter:loadParameters()
 	local filePath = system.pathForFile(Emitter.effectsFolder .. "/" .. 					-- the file to load with the parameters
@@ -64,7 +64,7 @@ function Emitter:loadParameters()
 	self:fixParameter("textureFileName") 													-- update files used with full path.
 end 
 
---//	Fix an effects parameter parameter (er..) by giving it the full effects folder path
+--//%	Fix an effects parameter parameter (er..) by giving it the full effects folder path
 --//	@paramName [string] 	parameter to fix 
 
 function Emitter:fixParameter(paramName)
