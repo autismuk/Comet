@@ -33,6 +33,8 @@ function Comet:initialise()
 	self.cm_queryCache = {} 																				-- cache of query results.
 	self.cm_invalidComponents = nil 																		-- component refs added/removed from entities
 	self.cm_cacheInfo = { hits = 0, total = 0 } 															-- track success of query cache.
+
+	self.cm_lastTime = 0 																					-- last system process time.
 end 
 
 --//	Destroy *all* entities and components.
@@ -41,7 +43,7 @@ function Comet:destroyAll()
 	for _,ref in pairs(self.cm_entities) do self:removeEntity(ref) end 										-- remove all entities.
 	self.cm_nextComponentID = nil self.cm_nextEntityID = nil 												-- and erase members
 	self.cm_components = nil self.cm_entities = nil self.cm_queryCache = nil 					
-	self.cm_cacheInfo = nil self.cm_invalidComponents = nil
+	self.cm_cacheInfo = nil self.cm_invalidComponents = nil self.cm_lastTime = nil
 end 
 
 --//	Helper method which converts a comma seperated string into an array of strings. Same as split() in Python.
@@ -136,8 +138,8 @@ function Comet:newE(cList)
 	self.cm_entities[ent.en_eID] = ent 																		-- save in the entities table under ID.
 	self.cm_nextEntityID = self.cm_nextEntityID + 1 														-- bump the entity ID
 	if cList ~= nil then self:insertComponent(ent,cList) end 												-- insert into the list if component list provided.
-	ent.addC = function(...) self.insertComponent(ent,...) end 												-- decorate with methods
-	ent.remC = function(...) self.removeComponent(ent,...) end
+	ent.addC = function(...) self.insertComponent(ent,...) return ent end 									-- decorate with methods
+	ent.remC = function(...) self.removeComponent(ent,...) return ent end
 	ent.remove = function(...) self.removeEntity(ent,...) end
 	return ent
 end 
@@ -366,35 +368,40 @@ function Comet:newS(componentList,updateMethod,options)
 end 
 
 function Comet:process()
-	for _,system in ipairs(self.cm_systems) do self:runSystem(system) end 									-- run all systems.
+	local info = { manager = self }
+	local time = system.getTimer() 																			-- work out delta time
+	info.deltaTime = math.min(time - self.cm_lastTime,100) / 1000 											-- delta time is time since last ms, max 0.1s
+	self.cm_lastTime = time 																				-- update last time.
+	for _,system in ipairs(self.cm_systems) do self:runSystem(system,info) end 								-- run all systems.
 end
 
-function Comet:runSystem(system)
+function Comet:runSystem(system,info)
 	local result = self:query(system.query)																	-- perform the query
 	if #result == 0 then return end 																		-- there are no matching entities.
 
 	if system.preprocess ~= nil then 																		-- preprocess method provided 
 		system.preprocess(result)
 	elseif type(system.updateMethod) == "table" and system.updateMethod.preprocess ~= nil then 				-- or call it as a class.
-		system.updateMethod:preprocess(result)
+		system.updateMethod:preprocess(result,info)
 	end
 
 	for _,entity in ipairs(result) do 																		-- work through all entities in system
 		if type(system.updateMethod) == "function" then 													-- is it a function ?
-			system.updateMethod(entity,self) 																-- call it.
+			system.updateMethod(entity,info) 																-- call it.
 		else 
-			system.updateMethod:update(entity,self) 														-- else call it as a method 
+			system.updateMethod:update(entity,info) 														-- else call it as a method 
 		end
 	end
 
 	if system.postprocess ~= nil then 																		-- postprocess method provided 
 		system.postprocess(result)
 	elseif type(system.updateMethod) == "table" and system.updateMethod.postprocess ~= nil then 			-- or call it as a class.
-		system.updateMethod:postprocess(result)
+		system.updateMethod:postprocess(result,info)
 	end
 end 
 
 return Comet
+
 -- members should not be duplicates (or warn !) ?
 -- only execute entities with an eID value - entities may have been deleted for some reason.
 -- .format on members,
