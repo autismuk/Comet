@@ -143,6 +143,7 @@ function Component:initialise(comet,name,info)
 	self.co_requires = {} 																		-- list of required components by reference
 	self.co_members = {} 																		-- table of members name => default value
 	self.co_methods = {} 																		-- table of methods name => function
+	self.co_entities = {} 																		-- hash of entities that use this component (ref->ref)
 	self.co_instanceCount = 0 																	-- number of instances.
 
 	self:addInfo(info) 																			-- add basic information from the source object.
@@ -267,6 +268,7 @@ function Entity:addComponentByReference(component)
 	if self.en_components[component] ~= nil then return end 									-- if it is already there, we do not mind.
 	-- print("Adding",component.co_name)
 	self.en_components[component] = component 													-- add it in to the entity list
+	component.co_entities[self] = self 															-- add it to the component's entity record
 	component.co_instanceCount = component.co_instanceCount + 1 								-- increment component instance count
 	self:initialiseMembers(component) 															-- initialise the members on this component
 	self.en_comet:invalidateCache(component) 													-- invalidate the query cache for this component
@@ -296,6 +298,7 @@ function Entity:removeComponentByReference(component)
 			"Component is not present and/or has already been removed [" .. component.co_name.."]")
 	-- print("Removing",component.co_name)
 	self.en_components[component] = nil 														-- remove it from the component list.
+	component.co_entities[self] = nil 															-- remove it from the component's entity record
 	component.co_instanceCount = component.co_instanceCount - 1 								-- decrement component instance count
 	if component.co_destructor ~= nil then 														-- call the destructor if there is one.
 		self:methodCall(component,component.co_destructor) 
@@ -331,38 +334,78 @@ function Entity:toString()
 	return s 
 end 
 
+--- ***********************************************************************************************************************************************************************
+--//								Non-cached query class. Maintains a query which is immutable, and calculates the result set.
+--- ************************************************************************************************************************************************************************
 
---- ************************************************************************************************************************************************************************
---- ************************************************************************************************************************************************************************
+local Query = Base:new() 
+
+--//	Prepare a query. Queries are immutable in terms of what they are querying on.
+--//	@comet 		[Comet]						comet object
+--//	@query  	[string, Component, table]	A name or CSV Names, a single component, or a list of query, that go to make up the query.
+
+function Query:initialise(comet,query)
+	assert(comet ~= nil and type(comet) == "table" and comet.cm_entities ~= nil,"Bad Comet")-- Check the first parameter is a comet.
+	self.qu_comet = comet 																	-- save comet.
+	query = comet:processList(query) 														-- convert to useable list.
+	assert(#query > 0,"Query must have at least one component to check")
+	local keyNames = {} 																	-- convert query back to a list of names.
+	for i = 1,#query do keyNames[i] = query[i].co_name  end
+	table.sort(keyNames) 																	-- sort those names alphabetically.
+	self.qu_queryKey = table.concat(keyNames,":")											-- make it a unique key for this query.
+	self.qu_query = query 																	-- save the query part.
+	self.qu_size = #query 																	-- number of elements in the query.
+end
+
+--//	Clean up a query object.
+
+function Query:remove()
+	self.qu_comet = nil self.qu_queryKey = nil self.qu_query = nil self.qu_size = nil 		-- tidy up
+end
+
+--//	Execute a query.
+--//	@return 	[table]			List of entities satisfying that query.
+
+function Query:query() 	
+	if self.qu_size > 1 then 																-- if more than one component, sort by instance size
+		table.sort(self.qu_query,  															-- so when we scan we start with the smallest entity list.
+						function(a,b) return a.co_instanceCount < b.co_instanceCount end)
+	end 
+
+	local result = {} 																		-- this is the result of the query.
+	local firstLevel = self.qu_query[1].co_entities 										-- this is a list of entities present in the first level.
+	for _,entity in pairs(firstLevel) do 													-- scan through all entities in the first level of the query
+		local level = 2
+		local isOk = true 
+		while isOk and level <= self.qu_size do 											-- now check all the sub levels.
+			isOk = self.qu_query[level].co_entities[entity] ~= nil 							-- ok if the component list at that level contains the entity we are checking.
+			level = level + 1 																-- advance to next level.
+		end 
+		if isOk then result[#result+1] = entity end 										-- if matched, then add to the result set.
+	end
+	return result
+end 
 
 _G.Comet = Comet require("bully")
 
--- Base Query
 -- Base Query test
 -- Add caching
--- Count of each number of components.
 
---[[
 local comet = Comet:new()
 
-local c1 = Component:new(comet,"c1",{ x = 0, y = 0, z = {}, 
-			constructor = function(c,e,p) print("Construct c1",c,e,p) p.s = "Hi !" end, 
-			destructor = function(c,e,p) print("Destroy c1",c,e,p,p.s) end})
-
+local c1 = comet:newC({ name = "c1",a = 4,x2 = 3 })
 local c2 = comet:newC({ name = "c2",a = 4,x2 = 3 })
+local c3 = comet:newC({ name = "c3",a = 4,x2 = 3 })
+local c4 = comet:newC({ name = "c4",a = 4,x2 = 3 })
 
-local c3Class = Base:new()
-function c3Class.constructor(c,e,p) print("Construct c3",c,e,p) end
-function c3Class.destructor(c,e,p) print("Destruct c3",c,e,p) end
-local c3 = comet:newC("c3",c3Class)
+local e1 = comet:newE({},"c1,c3")
+local e2 = comet:newE({}) e2:addC({c1,c2,c3})
+local e3 = comet:newE({},{c1,c2,c3})
+local e4 = comet:newE({},{c1,c4})
 
-print(c1:toString())
-print(c2:toString())
-
-local e1 = Entity:new(comet,{ x = 4444, x2 = 7777},{c1,c2,c3})
-print("C1",c1,"E1",e1,"C3",c3)
-print(e1:toString())
-e1:remove()
-comet:remove()
-
---]]
+e1.__name = "e1" e2.__name = "e2" e3.__name = "e3" e4.__name = "e4"
+q = Query:new(comet,{c2})
+r = q:query()
+for i = 1,#r do 
+	print(r[i].__name)
+end

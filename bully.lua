@@ -61,11 +61,13 @@ function checkInstanceCount()
 	local iCount = {}
 	for _,entity in ipairs(entityRefs) do 																-- work through all the entity refs.
 		for _,component in pairs(entity.en_components) do 												-- work through all the components.
-			iCount[component] = (iCount[component] or 0) + 1 	
+			iCount[component] = (iCount[component] or 0) + 1 	 										-- count the total number of components in the entity.
+			assert(component.co_entities[entity] ~= nil)  												-- true if the component table shows it is in this entity - should be !
 		end 
 	end 
-	for _,component in ipairs(compRefs) do 
-		assert(component.co_instanceCount == (iCount[component] or 0)) 
+	for _,component in ipairs(compRefs) do  															-- work through all the components
+		assert(component.co_instanceCount == (iCount[component] or 0))  								-- do the entity counts match ?
+		assert(component.co_instanceCount == tableCount(component.co_entities)) 						-- do the entity counts match the number of entries in the table.
 	end 
 end
 
@@ -99,7 +101,7 @@ for i = 1,entityCount do 																				-- initially they are all completel
 	entityComps[entityRefs[i]] = {} 																	-- clear the table of components for this entity.
 end 
 
-for i = 1,1000 do 
+for i = 1,1000*10 do 
 	changeAnEntity()  																					-- randomly change one entity
 	if math.random(1,entityKillChance) == 1 then randomKill() end 										-- randomly kill one entity
 	checkInstanceCount() 																				-- check the instance count.
