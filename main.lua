@@ -105,6 +105,14 @@ function Comet:newC(name,source)
 	return Component:new(self,name,source) 														-- calls the component constructor.
 end 
 
+--//	Create a new entity. Uses entity.new effectively, but shorthand
+--//	@name 		[string] 				Component Name (optional parameter, can be name in source table)
+--//	@info 	 	[table/object]			Table, Class or Instance being used to create the component.
+
+function Comet:newE(name,info)
+	return Entity:new(self,name,info)
+end 
+
 --- ************************************************************************************************************************************************************************
 --//	Component Class. This is a Hybrid system so Components and contain Methods, Message Recipients, Constructors, Destructors and anything else you like.
 --//	Components are built out of tables containing member variables they use, functions they use, and requires (the components that are required), and 
@@ -119,7 +127,7 @@ Component = Base:new()
 --//	preceded with an underscore is not added to the component. 
 --//	@comet 		[Comet]					Comet object being added to.
 --//	@name 		[string] 				Component Name (optional parameter, can be name in source table)
---//	@source 	[table/object]			Table, Class or Instance being used to create the component.
+--//	@info 	 	[table/object]			Table, Class or Instance being used to create the component.
 
 function Component:initialise(comet,name,info)
 	assert(comet ~= nil and type(comet) == "table" and comet.cm_components ~= nil,"Bad Comet")	-- Check the first parameter is a comet.
@@ -135,6 +143,7 @@ function Component:initialise(comet,name,info)
 	self.co_requires = {} 																		-- list of required components by reference
 	self.co_members = {} 																		-- table of members name => default value
 	self.co_methods = {} 																		-- table of methods name => function
+	self.co_instanceCount = 0 																	-- number of instances.
 
 	self:addInfo(info) 																			-- add basic information from the source object.
 	assert(self.co_name ~= nil and type(self.co_name) == "string","Bad component name")			-- check name is a string.
@@ -218,6 +227,7 @@ function Entity:initialise(comet,initial,components)
 	self.en_components = {} 																	-- a list of components this entity has [comp ref => comp ref]
 	self.en_comet = comet 																		-- save reference to comet object
 	self.en_memberValues = initial or {} 														-- save the initialisation values.
+	self.en_privateComponentStore = {} 															-- private storage for components
 	comet.cm_entities[self] = self 																-- add into the known entities list.
 	if components ~= nil then self:addC(components) end 										-- add the relevant components.
 end 
@@ -229,6 +239,7 @@ function Entity:remove()
 	for k,v in pairs(self.en_components) do self:removeComponentByReference(v) end 				-- remove all components, call destructors etc.
 	self.en_comet.cm_entities[self] = nil 														-- clear reference in comet's entity table.
 	self.en_comet = nil self.en_components = nil self.en_memberValues = nil						-- and tidy up.
+	self.en_privateComponentStore = nil
 end 
 
 --//	Add a collection of components (which may take various forms)
@@ -254,13 +265,27 @@ end
 
 function Entity:addComponentByReference(component)
 	if self.en_components[component] ~= nil then return end 									-- if it is already there, we do not mind.
-	print("Adding",component.co_name)
+	-- print("Adding",component.co_name)
 	self.en_components[component] = component 													-- add it in to the entity list
-	-- TODO: Add it in, copying member data and initial data as required.
+	component.co_instanceCount = component.co_instanceCount + 1 								-- increment component instance count
+	self:initialiseMembers(component) 															-- initialise the members on this component
 	self.en_comet:invalidateCache(component) 													-- invalidate the query cache for this component
-	if component.co_constructor ~= nil then 														-- call the constructor if there is one.
+	if component.co_constructor ~= nil then 													-- call the constructor if there is one.
 		self:methodCall(component,component.co_constructor) 
 	end 		
+end 
+
+--//%	If the members for this component do not exist in the entity add them and load their initial values from
+--//	the en_memberValues member.
+--//	@component 	[Component]		Component to initialise members for.
+
+function Entity:initialiseMembers(component)
+	for k,v in pairs(component.co_members) do 													-- work through all the component members
+		if self[k] == nil then 																	-- if not already defined 
+			self[k] = v  																		-- define it.
+			if self.en_memberValues[k] ~= nil then self[k] = self.en_memberValues[k] end 		-- override with the member initialiser value
+		end
+	end
 end 
 
 --//%	Remove a single component by reference
@@ -269,11 +294,13 @@ end
 function Entity:removeComponentByReference(component)
 	assert(self.en_components[component] ~= nil,												-- however, we can only remove it once.
 			"Component is not present and/or has already been removed [" .. component.co_name.."]")
-	print("Removing",component.co_name)
+	-- print("Removing",component.co_name)
 	self.en_components[component] = nil 														-- remove it from the component list.
+	component.co_instanceCount = component.co_instanceCount - 1 								-- decrement component instance count
 	if component.co_destructor ~= nil then 														-- call the destructor if there is one.
 		self:methodCall(component,component.co_destructor) 
 	end 		
+	self.en_privateComponentStore[component.co_name] = nil 										-- free the private storage.
 	self.en_comet:invalidateCache(component) 													-- invalidate the query cache for this component
 end 
 
@@ -282,8 +309,10 @@ end
 --//	@method 	[function]		The function to call.
 
 function Entity:methodCall(component,method)
-	method(component,self,{})
-	-- TODO: Private storage for component.
+	if self.en_privateComponentStore[component.co_name] == nil then 							-- create components private information if needed
+		self.en_privateComponentStore[component.co_name] = {}
+	end
+	method(component,self,self.en_privateComponentStore[component.co_name]) 					-- call the method.
 end 
 
 --//	Convert an entity to a string representation
@@ -294,28 +323,46 @@ function Entity:toString()
 	local s = "[Entity] Components:"
 	for k,v in pairs(self.en_components) do s = s .. " " .. v.co_name end 
 	s = s .. "\nMembers:"
+	for k,v in pairs(self) do 
+		if type(v) ~=  "function" and k:sub(1,3) ~= "en_" then 
+			s = s .. " " .. k .. "=" .. tostring(v) 
+		end
+	end
 	return s 
 end 
 
+
+--- ************************************************************************************************************************************************************************
+--- ************************************************************************************************************************************************************************
+
+_G.Comet = Comet require("bully")
+
+-- Base Query
+-- Base Query test
+-- Add caching
+-- Count of each number of components.
+
+--[[
 local comet = Comet:new()
 
-local c1 = Component:new(comet,"c1",{ x = 4, y = 3, z = 2, constructor = function(c,e) print("Construct c1",c,e) end, destructor = function(c,e) print("Destroy c1",c,e) end})
+local c1 = Component:new(comet,"c1",{ x = 0, y = 0, z = {}, 
+			constructor = function(c,e,p) print("Construct c1",c,e,p) p.s = "Hi !" end, 
+			destructor = function(c,e,p) print("Destroy c1",c,e,p,p.s) end})
+
 local c2 = comet:newC({ name = "c2",a = 4,x2 = 3 })
 
 local c3Class = Base:new()
-function c3Class.constructor(c,e) print("Construct c3",c,e) end
-function c3Class.destructor(c,e) print("Destruct c3",c,e) end
+function c3Class.constructor(c,e,p) print("Construct c3",c,e,p) end
+function c3Class.destructor(c,e,p) print("Destruct c3",c,e,p) end
 local c3 = comet:newC("c3",c3Class)
 
 print(c1:toString())
 print(c2:toString())
 
-local e1 = Entity:new(comet,{},{c1,c2,c3})
+local e1 = Entity:new(comet,{ x = 4444, x2 = 7777},{c1,c2,c3})
 print("C1",c1,"E1",e1,"C3",c3)
 print(e1:toString())
 e1:remove()
 comet:remove()
 
--- TODO: Member adding and initialisation.
--- TODO: Add private storage code, only on demand.
--- TODO: Then bully test it.
+--]]
