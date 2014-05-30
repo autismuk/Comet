@@ -16,7 +16,6 @@ local Particle = require("system.particle")
 
 local c = Comet:new()
 
-
 --	sprite components and systems
 
 local c1 = c:newC("position","x:int,y:int")
@@ -36,9 +35,8 @@ e1.width = 64 e1.height = 64
 local e2 = c:newE({"position","size","coronaobject"})
 e2:addC("sprite","cat.jpg",44)
 e2.x,e2.y = 200,300
-e2.width = 100
-e2.height = 100
-
+e2.width = 150
+e2.height = 150
 
 --	systems for updating position and size.
 
@@ -105,7 +103,7 @@ c:newC("controller","controllerRef:table",
 -- add to entities
 
 e2:addC("controller")
-e1:addC("controller")
+-- e1:addC("controller")
 
 -- system to update vector from controller
 
