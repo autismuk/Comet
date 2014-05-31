@@ -12,11 +12,15 @@ local comet = Comet:new()
 
 local componentCount = 100																				-- number of components.
 local entityCount = 200 																				-- number of entities.
+local queryCount = 50 																					-- number of queries
+local maxQuerySize = 5 																					-- max length of query
+
 local entityKillChance = 5 																				-- chance of randomly chosen entity being killed. 
 
 local compRefs = {} 																					-- reference of components.
 local entityRefs = {} 																					-- reference of entities
 local entityComps = {} 																					-- entity components, keyed on the component entity reference, table of component keys.
+local queryRef = {} 																					-- query references.
 
 --- ************************************************************************************************************************************************************************
 
@@ -77,8 +81,51 @@ function randomKill()
 	local n = math.random(1,entityCount)
 	entityRefs[n]:remove()
 	entityRefs[n] = comet:newE()
+	entityRefs[n].ref = n
 	entityComps[entityRefs[n]] = {}
 end 
+
+--- ************************************************************************************************************************************************************************
+
+function calculateQueryResult(componentList)
+	local result = {} 																					-- results entityRef => entityRef
+	for _,entity in pairs(entityRefs) do  																-- check all known entities
+		local ok = true 
+		for _,comp in ipairs(componentList) do  														-- look through every component list of query
+			ok = ok and (entityComps[entity][comp] ~= nil) 												-- check it is in the entity
+		end 
+		if ok then result[entity] = entity end  														-- if all are, then add to the result hash.
+	end
+	return result 
+end 
+
+--- ************************************************************************************************************************************************************************
+
+function processQueries() 
+	local n = math.random(1,queryCount) 																-- randomly kill a query
+	if queryRef[n] ~= nil then 
+		queryRef[n]:remove()
+		queryRef[n] = nil 
+	end 
+	for i = 1,queryCount do 																			-- work through queries
+		if queryRef[i] == nil then 																		-- new query required ?
+			local s = "" 																				-- build a new query.
+			local size = math.random(1,maxQuerySize)
+			for p = 1,size do 
+				local newPart = ""
+				repeat 
+					newPart = compRefs[math.random(1,componentCount)].co_name 
+				until s:find(newPart) == nil 
+				if #s > 0 then s = s .. "," end s = s .. newPart
+			end
+			queryRef[i] = comet:newQ(s) 																-- create a new query instance.
+		end
+		local result = queryRef[i]:query() 																-- run the query
+		local cResult = calculateQueryResult(queryRef[i].qu_query)										-- calculate it the long way.
+		assert(tableCount(cResult) == #result) 															-- tabes have the same number of members ?
+		for _,entity in ipairs(result) do assert(cResult[entity] ~= nil) end  							-- check every entity in the result is in the calculated one.
+	end
+end
 
 --- ************************************************************************************************************************************************************************
 
@@ -95,16 +142,22 @@ for i = 1,componentCount do  																			-- create the components
 	compRefs[i] = comet:newC(cName,members)
 end
 
-
 for i = 1,entityCount do 																				-- initially they are all completely empty
 	entityRefs[i] = comet:newE() 
+	entityRefs[i].ref = i
 	entityComps[entityRefs[i]] = {} 																	-- clear the table of components for this entity.
 end 
 
-for i = 1,1000*10 do 
+for i = 1,queryCount do  																				-- clear all queries
+	queryRef[i] = nil 
+end 
+
+for i = 1,100*1000 do 
+	if i % 250 == 0 then print("Processed ",i) end 														-- progress report
 	changeAnEntity()  																					-- randomly change one entity
 	if math.random(1,entityKillChance) == 1 then randomKill() end 										-- randomly kill one entity
 	checkInstanceCount() 																				-- check the instance count.
+	processQueries() 																					-- check the queries.
 end 
 
 print("Done") print(cdCount) comet:remove() print(cdCount)

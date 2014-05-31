@@ -11,7 +11,7 @@
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
 
-local Comet, Component, Entity 																	-- this to avoid fwd referencing issues.
+local Comet, Component, Entity, Query 															-- this to avoid fwd referencing issues.
 
 --- ************************************************************************************************************************************************************************
 --//	Comet class. This is the manager of the current set of entities, components and systems.
@@ -111,6 +111,13 @@ end
 
 function Comet:newE(name,info)
 	return Entity:new(self,name,info)
+end 
+
+--//	Create a new query. Uses Query.new effectively, but shorthand
+--//	@query 	 	[table/object]			Table, Class or Instance being used to create the query
+
+function Comet:newQ(query)
+	return Query:new(self,query)
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -338,7 +345,7 @@ end
 --//								Non-cached query class. Maintains a query which is immutable, and calculates the result set.
 --- ************************************************************************************************************************************************************************
 
-local Query = Base:new() 
+Query = Base:new() 
 
 --//	Prepare a query. Queries are immutable in terms of what they are querying on.
 --//	@comet 		[Comet]						comet object
@@ -349,12 +356,14 @@ function Query:initialise(comet,query)
 	self.qu_comet = comet 																	-- save comet.
 	query = comet:processList(query) 														-- convert to useable list.
 	assert(#query > 0,"Query must have at least one component to check")
-	local keyNames = {} 																	-- convert query back to a list of names.
-	for i = 1,#query do keyNames[i] = query[i].co_name  end
-	table.sort(keyNames) 																	-- sort those names alphabetically.
-	self.qu_queryKey = table.concat(keyNames,":")											-- make it a unique key for this query.
 	self.qu_query = query 																	-- save the query part.
 	self.qu_size = #query 																	-- number of elements in the query.
+
+--	local keyNames = {} 																	-- convert query back to a list of names.
+--	for i = 1,#query do keyNames[i] = query[i].co_name  end
+--	table.sort(keyNames) 																	-- sort those names alphabetically.
+--	self.qu_queryKey = table.concat(keyNames,":")											-- make it a unique key for this query.
+
 end
 
 --//	Clean up a query object.
@@ -388,7 +397,7 @@ end
 
 _G.Comet = Comet require("bully")
 
--- Base Query test
+-- Query keeps fast look up of components as well as lists.
 -- Add caching
 
 local comet = Comet:new()
