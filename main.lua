@@ -11,7 +11,7 @@
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
 
-local Comet, Component, Entity, Query 															-- this to avoid fwd referencing issues.
+local Comet, Component, Entity, Query, QueryCache, CachedQuery 									-- this to avoid fwd referencing issues.
 
 --- ************************************************************************************************************************************************************************
 --//	Comet class. This is the manager of the current set of entities, components and systems.
@@ -25,6 +25,7 @@ function Comet:initialise()
 	self.cm_components = {} 																	-- known components (ref => ref)
 	self.cm_entities = {} 																		-- known entities (ref => ref)
 	self.cm_invalidComponentList = {} 															-- components whose cached queries are now invalid (ref=>ref)
+	self.cm_queryCache = QueryCache:new(self) 													-- create a query cache.
 end 
 
 --//	Delete the Comet object
@@ -32,8 +33,9 @@ end
 function Comet:remove() 
 	-- TODO: Delete all systems ?
 	for k,v in pairs(self.cm_entities) do v:remove() end 										-- remove all entities
+	self.cm_queryCache:remove() 																-- remove query cache
 	self.cm_components = nil self.cm_invalidComponentList = nil 								-- and tidy up.
-	self.cm_entities = nil
+	self.cm_entities = nil self.cm_queryCache = nil
 end 
 
 --//%	Given either a csv string, or a table of strings, convert it to a table of component references.
@@ -97,6 +99,13 @@ function Comet:invalidateCache(component)
 	self.cm_invalidComponentList[component] = component 										-- mark that component as not valid (entity add/removed it.)
 end
 
+--//% 	Retrieve the query cache object address
+--//	@return [QueryCache] 			QueryCache instance.
+
+function Comet:getQueryCache() 
+	return self.cm_queryCache 
+end 
+
 --//	Create a new component. Uses component.new effectively, but shorthand
 --//	@name 		[string] 				Component Name (optional parameter, can be name in source table)
 --//	@source 	[table/object]			Table, Class or Instance being used to create the component.
@@ -117,7 +126,7 @@ end
 --//	@query 	 	[table/object]			Table, Class or Instance being used to create the query
 
 function Comet:newQ(query)
-	return Query:new(self,query)
+	return CachedQuery:new(self,query)
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -352,24 +361,19 @@ Query = Base:new()
 --//	@query  	[string, Component, table]	A name or CSV Names, a single component, or a list of query, that go to make up the query.
 
 function Query:initialise(comet,query)
+	if comet == nil then return end
 	assert(comet ~= nil and type(comet) == "table" and comet.cm_entities ~= nil,"Bad Comet")-- Check the first parameter is a comet.
 	self.qu_comet = comet 																	-- save comet.
 	query = comet:processList(query) 														-- convert to useable list.
 	assert(#query > 0,"Query must have at least one component to check")
 	self.qu_query = query 																	-- save the query part.
 	self.qu_size = #query 																	-- number of elements in the query.
-
---	local keyNames = {} 																	-- convert query back to a list of names.
---	for i = 1,#query do keyNames[i] = query[i].co_name  end
---	table.sort(keyNames) 																	-- sort those names alphabetically.
---	self.qu_queryKey = table.concat(keyNames,":")											-- make it a unique key for this query.
-
 end
 
 --//	Clean up a query object.
 
 function Query:remove()
-	self.qu_comet = nil self.qu_queryKey = nil self.qu_query = nil self.qu_size = nil 		-- tidy up
+	self.qu_comet = nil self.qu_query = nil self.qu_size = nil 								-- tidy up
 end
 
 --//	Execute a query.
@@ -395,9 +399,72 @@ function Query:query()
 	return result
 end 
 
+--- ***********************************************************************************************************************************************************************
+--//	Query Cache
+--- ***********************************************************************************************************************************************************************
+
+QueryCache = Base:new()
+
+function QueryCache:initialise(comet)
+end 
+
+function QueryCache:remove()
+end 
+
+function QueryCache:access(queryKey)
+	-- TODO: If the invalid component table is not nil, remove any matching components.
+	-- TODO: If an entry remains, return it.
+	return nil
+end
+
+function QueryCache:update(queryKey,queryResult,queryComponents)
+	-- TODO: Update the cache with the stirng key, result, and component usage [component ref => <unused>]
+end 
+
+--- ***********************************************************************************************************************************************************************
+--//	Query which caches. This extends the normal always-calculate Query class, creating two extra members, a key which can be used to uniquely identify any
+--//	query, and a table where the keys are the component references. The latter is so the query checker can answer the question very quickly, does this 
+--//	query contains this component (by testing for the key existence)
+--- ***********************************************************************************************************************************************************************
+
+CachedQuery = Query:new()
+
+--//	Prepare a cached query. Queries are immutable in terms of what they are querying on.
+--//	@comet 		[Comet]						comet object
+--//	@query  	[string, Component, table]	A name or CSV Names, a single component, or a list of query, that go to make up the query.
+
+function CachedQuery:initialise(comet,query) 
+	Query.initialise(self,comet,query)														-- do superclass
+	local keyNames = {} 																	-- used convert query back to a list of names.
+	self.qu_fastComponentCheck = {} 														-- a key is present for each component in the query - fast test.
+	for i = 1,#self.qu_query do 															-- for each query
+		keyNames[i] = self.qu_query[i].co_name  											-- get the key name.
+		self.qu_fastComponentCheck[self.qu_query[i]] = true 								-- set the key in the fast test table.
+	end
+	table.sort(keyNames) 																	-- sort those names alphabetically.
+	self.qu_queryKey = table.concat(keyNames,":")											-- make it a unique key for this query.
+end 
+
+--//	Execute a query, accessing the cache if there is something in the cache and it is still valud.
+--//	@return 	[table]			List of entities satisfying that query.
+
+function CachedQuery:query()
+	local cacheResult = self.qu_comet:getQueryCache():access(self.qu_queryKey) 				-- try to read it from the cache.
+	if cacheResult ~= nil then return cacheResult end 										-- if found, return it.
+	local result = Query.query(self)														-- otherwise access the query the hard way.
+	self.qu_comet:getQueryCache():update(self.qu_queryKey,result,self.qu_fastComponentCheck)-- update the cache using the string key, result, and fast
+	return result
+end
+
+--//	Clean up a cached query object.
+
+function CachedQuery:remove() 
+	Query.remove(self) 																		-- call superclass destructor.
+	self.qu_queryKey = nil self.qu_fastComponentCheck = nil									-- tidy up.
+end 
+
 _G.Comet = Comet require("bully")
 
--- Query keeps fast look up of components as well as lists.
 -- Add caching
 
 local comet = Comet:new()
@@ -413,7 +480,7 @@ local e3 = comet:newE({},{c1,c2,c3})
 local e4 = comet:newE({},{c1,c4})
 
 e1.__name = "e1" e2.__name = "e2" e3.__name = "e3" e4.__name = "e4"
-q = Query:new(comet,{c2})
+q = CachedQuery:new(comet,{c2})
 r = q:query()
 for i = 1,#r do 
 	print(r[i].__name)
