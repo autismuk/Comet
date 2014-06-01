@@ -152,7 +152,7 @@ for i = 1,queryCount do  																				-- clear all queries
 	queryRef[i] = nil 
 end 
 
-for i = 1,100*100 do 
+for i = 1,100*1000 do 
 	if i % 250 == 0 then print("Processed ",i) end 														-- progress report
 	changeAnEntity()  																					-- randomly change one entity
 	if math.random(1,entityKillChance) == 1 then randomKill() end 										-- randomly kill one entity

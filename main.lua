@@ -24,7 +24,7 @@ Comet = Base:new()
 function Comet:initialise()
 	self.cm_components = {} 																	-- known components (ref => ref)
 	self.cm_entities = {} 																		-- known entities (ref => ref)
-	self.cm_invalidComponentList = {} 															-- components whose cached queries are now invalid (ref=>ref)
+	self.cm_invalidComponentList = nil 															-- components whose cached queries are now invalid (ref=>ref)
 	self.cm_queryCache = QueryCache:new(self) 													-- create a query cache.
 end 
 
@@ -96,8 +96,19 @@ end
 --//	@component 	[component] 		Component added or removed.
 
 function Comet:invalidateCache(component)
+	self.cm_invalidComponentList = self.cm_invalidComponentList or {} 							-- create the list if needed
 	self.cm_invalidComponentList[component] = component 										-- mark that component as not valid (entity add/removed it.)
 end
+
+--//%	Get the list of components that have been invalidated since the last call to this function (or the start). Components are 'invalidated' if they
+--//	have been added to or removed from entities (hence, any cached list of entities that match those components are wrong)
+--//	@return 	[table]				List of those components, nil if the list is empty
+
+function Comet:getInvalidateCacheAndReset() 
+	local invalidList = self.cm_invalidComponentList 											-- get the list (component => component)
+	self.cm_invalidComponentList = nil															-- reset the list
+	return invalidList 
+end 
 
 --//% 	Retrieve the query cache object address
 --//	@return [QueryCache] 			QueryCache instance.
@@ -122,7 +133,7 @@ function Comet:newE(name,info)
 	return Entity:new(self,name,info)
 end 
 
---//	Create a new query. Uses Query.new effectively, but shorthand
+--//	Create a new query. Uses CachedQuery.new effectively, but shorthand.
 --//	@query 	 	[table/object]			Table, Class or Instance being used to create the query
 
 function Comet:newQ(query)
@@ -400,25 +411,60 @@ function Query:query()
 end 
 
 --- ***********************************************************************************************************************************************************************
---//	Query Cache
+--//	Query Cache. Maintains two tables, a cache of a result and a list of the components used in the query (in the keys of the table), and tracks whether the
+--//	cached query can be reused.
 --- ***********************************************************************************************************************************************************************
 
 QueryCache = Base:new()
 
+--//	Initialise the query cache.
+--//	@comet 		[Comet]						comet object
+
 function QueryCache:initialise(comet)
+	self.qc_comet = comet 																	-- save commet reference
+	self.qc_resultCache = {} 																-- query key to result cache.
+	self.qc_queryComponents = {} 															-- query key to components in query (as keys)
+	self.qc_queryCount = 0 self.qc_cacheHitCount = 0 										-- check effectiveness of caching.
 end 
+
+--//	Close and tidy up. Also (optionally using comment) prints the cache efficiency on the debug screen.
 
 function QueryCache:remove()
+	print(math.round(self.qc_cacheHitCount/self.qc_queryCount*100).." % cache hits")
+	self.qc_comet = nil self.qc_resultCache = nil self.qc_queryComponents = nil 			-- tidy up
+	self.qc_queryCount = nil self.qc_cacheHitCount = nil 
 end 
 
+--//	Cache access check. First it gets the list of the components that are invalid - i.e. have been added or removed from an entity (because any query
+--//	featuring those components will have changed its result) and scans through the cache looking for queries that have any of those components
+--//	they are consequently invalidated.
+--//	@queryKey 	[string] 		Unique identifier for any query
+
 function QueryCache:access(queryKey)
-	-- TODO: If the invalid component table is not nil, remove any matching components.
-	-- TODO: If an entry remains, return it.
-	return nil
+	local invalidList = self.qc_comet:getInvalidateCacheAndReset() 							-- get the changed components list and reset.
+	if invalidList ~= nil then 
+		for key,qComp in pairs(self.qc_queryComponents) do 									-- work through all the queries.
+			for c,_ in pairs(invalidList) do  												-- work through the invalid list for each.
+				if qComp[c] ~= nil then  													-- is the component present.
+					self.qc_resultCache[key] = nil  										-- if so, invalidate the query.
+					self.qc_queryComponents[key] = nil
+					break 																	-- and break the loop, we don't need to check any more
+				end
+			end 
+		end
+	end 
+	self.qc_queryCount = self.qc_queryCount + 1 											-- track caching effectiveness.
+	if self.qc_resultCache[queryKey] ~= nil then self.qc_cacheHitCount = self.qc_cacheHitCount + 1 end
+	return self.qc_resultCache[queryKey]													-- return the cached result, or nil if there is none.
 end
 
+--//	Update the key with a new result
+--//	@queryKey 	 	 [string] 		Unique identifier for any query
+--//	@queryResult 	 [table] 		List of entities from successful query
+--//	@queryComponents [table]		List of components used in that query (component ref -> <true>)
 function QueryCache:update(queryKey,queryResult,queryComponents)
-	-- TODO: Update the cache with the stirng key, result, and component usage [component ref => <unused>]
+	self.qc_resultCache[queryKey] = queryResult 											-- save result
+	self.qc_queryComponents[queryKey] = queryComponents 									-- save components of query.
 end 
 
 --- ***********************************************************************************************************************************************************************
@@ -485,3 +531,5 @@ r = q:query()
 for i = 1,#r do 
 	print(r[i].__name)
 end
+
+comet:remove()
