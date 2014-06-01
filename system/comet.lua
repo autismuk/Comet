@@ -1,6 +1,6 @@
 --- ************************************************************************************************************************************************************************
 ---
----				Name : 		main.lua
+---				Name : 		comet.lua
 ---				Purpose :	COMET (Component/Entity Framework for Corona/Lua), version 3.0
 ---				Created:	30 May 2014
 ---				Author:		Paul Robson (paul@robsons.org.uk)
@@ -509,27 +509,4 @@ function CachedQuery:remove()
 	self.qu_queryKey = nil self.qu_fastComponentCheck = nil									-- tidy up.
 end 
 
-_G.Comet = Comet require("bully")
-
--- Add caching
-
-local comet = Comet:new()
-
-local c1 = comet:newC({ name = "c1",a = 4,x2 = 3 })
-local c2 = comet:newC({ name = "c2",a = 4,x2 = 3 })
-local c3 = comet:newC({ name = "c3",a = 4,x2 = 3 })
-local c4 = comet:newC({ name = "c4",a = 4,x2 = 3 })
-
-local e1 = comet:newE({},"c1,c3")
-local e2 = comet:newE({}) e2:addC({c1,c2,c3})
-local e3 = comet:newE({},{c1,c2,c3})
-local e4 = comet:newE({},{c1,c4})
-
-e1.__name = "e1" e2.__name = "e2" e3.__name = "e3" e4.__name = "e4"
-q = CachedQuery:new(comet,{c2})
-r = q:query()
-for i = 1,#r do 
-	print(r[i].__name)
-end
-
-comet:remove()
+return Comet 
