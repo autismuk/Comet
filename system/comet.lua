@@ -11,7 +11,7 @@
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
 
-local Comet, Component, Entity, Query, QueryCache, CachedQuery 									-- this to avoid fwd referencing issues.
+local Comet, Component, Entity, Query, QueryCache, CachedQuery, System 							-- this to avoid fwd referencing issues.
 
 --- ************************************************************************************************************************************************************************
 --//	Comet class. This is the manager of the current set of entities, components and systems.
@@ -24,6 +24,7 @@ Comet = Base:new()
 function Comet:initialise()
 	self.cm_components = {} 																	-- known components (ref => ref)
 	self.cm_entities = {} 																		-- known entities (ref => ref)
+	self.cm_systems = {} 																		-- known systems (index => ref)
 	self.cm_invalidComponentList = nil 															-- components whose cached queries are now invalid (ref=>ref)
 	self.cm_queryCache = QueryCache:new(self) 													-- create a query cache.
 end 
@@ -33,9 +34,10 @@ end
 function Comet:remove() 
 	-- TODO: Delete all systems ?
 	for k,v in pairs(self.cm_entities) do v:remove() end 										-- remove all entities
+	for k,v in pairs(self.cm_systems) do v:remove() end 										-- remove all systems
 	self.cm_queryCache:remove() 																-- remove query cache
 	self.cm_components = nil self.cm_invalidComponentList = nil 								-- and tidy up.
-	self.cm_entities = nil self.cm_queryCache = nil
+	self.cm_entities = nil self.cm_queryCache = nil self.cm_systems = nil
 end 
 
 --//%	Given either a csv string, or a table of strings, convert it to a table of component references.
@@ -117,6 +119,21 @@ function Comet:getQueryCache()
 	return self.cm_queryCache 
 end 
 
+--//% 	Register a new system with comet
+--//	@system 	[System]				System to be registered.
+
+function Comet:registerSystem(system) 
+	self.cm_systems[#self.cm_systems+1] = system 												-- add to system list
+end 
+
+--//	Update all systems.
+
+function Comet:updateSystems()
+	for _,system in ipairs(self.cm_systems) do 													-- work through all systems
+		system:update()																			-- and update them.
+	end 
+end 
+
 --//	Create a new component. Uses component.new effectively, but shorthand
 --//	@name 		[string] 				Component Name (optional parameter, can be name in source table)
 --//	@source 	[table/object]			Table, Class or Instance being used to create the component.
@@ -138,6 +155,14 @@ end
 
 function Comet:newQ(query)
 	return CachedQuery:new(self,query)
+end 
+
+--//	Create a new System. Uses System.new
+--//	@query  	[string, Component, table]	A name or CSV Names, a single component, or a list of query, that go to make up the query.
+--//	@updater 	[function/table/class]		If a function, it is a standalone update, otherwise a collection of methods.
+
+function Comet:newS(query,updater)
+	return System:new(self,query,updater)
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -299,6 +324,9 @@ function Entity:addComponentByReference(component)
 	component.co_instanceCount = component.co_instanceCount + 1 								-- increment component instance count
 	self:initialiseMembers(component) 															-- initialise the members on this component
 	self.en_comet:invalidateCache(component) 													-- invalidate the query cache for this component
+	if component.co_requires ~= nil then 														-- add in any required components.
+		self:addC(component.co_requires) 
+	end
 	if component.co_constructor ~= nil then 													-- call the constructor if there is one.
 		self:methodCall(component,component.co_constructor) 
 	end 		
@@ -508,5 +536,60 @@ function CachedQuery:remove()
 	Query.remove(self) 																		-- call superclass destructor.
 	self.qu_queryKey = nil self.qu_fastComponentCheck = nil									-- tidy up.
 end 
+
+--- ***********************************************************************************************************************************************************************
+--		System Class. A system is basically a query - a collection of entities with common components, that have associated functions for preProcess, postProcess, and 
+--		update.
+--- ***********************************************************************************************************************************************************************
+
+System = Base:new()
+
+--//	System Constructor.
+--//	@comet 		[Comet]						comet object
+--//	@query  	[string, Component, table]	A name or CSV Names, a single component, or a list of query, that go to make up the query.
+--//	@updater 	[function/table/class]		If a function, it is a standalone update, otherwise a collection of methods.
+
+function System:initialise(comet,query,updater)
+	assert(comet ~= nil and type(comet) == "table" and comet.cm_entities ~= nil,"Bad Comet")-- Check the first parameter is a comet.
+	self.sy_comet = comet 																	-- save comet reference
+	self.sy_query = CachedQuery:new(comet,query)											-- create a query.
+	if type(updater) == "function" then 													-- is updater just a function.
+		updater = { update = updater }														-- convert to one element table with an update function.
+	end 
+	assert(updater.update ~= nil,"No update() method for system")							-- if nothing else, there's an update method.
+	self.sy_methods = updater 																-- save the methods.
+	self.sy_comet:registerSystem(self) 														-- tell Comet about the new system.
+	self.sy_lastUpdate = system.getTimer() 													-- last update (i.e. basically none)
+end 
+
+--//	Remove a system.
+
+function System:remove() 
+	self.sy_query:remove() 																	-- remove the query
+	self.sy_query = nil self.sy_comet = nil self.sy_methods = nil 							-- and tidy up.
+	self.sy_lastUpdate = nil self.deltaTime = nil
+end 
+
+--//	Update a system.
+
+function System:update() 
+	local result = self.sy_query:query() 
+	if self.sy_methods.preProcess ~= nil then 												-- call pre-processing if present.
+		self.sy_methods.preProcess(result)
+	end 
+
+	local time = system.getTimer()
+	self.deltaTime = math.min(100,time - self.sy_lastUpdate) / 1000
+	self.sy_lastUpdate = time
+
+	for _,entity in ipairs(result) do 														-- call update on every entity.
+		self.sy_methods.update(self.sy_comet,entity,self)
+	end 
+
+	if self.sy_methods.postProcess ~= nil then 												-- call post-processing if present.
+		self.sy_methods.postProcess(result)
+	end 
+end 
+
 
 return Comet 
