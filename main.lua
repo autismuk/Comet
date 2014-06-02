@@ -4,6 +4,9 @@
 -- require("bully")
 
 local Comet = require("system.comet")																				-- bring in the library
+local Effects = require("system.particle")
+
+--Effects.Emitter:new("stars"):start(160,240)
 
 local comet = Comet:new() 																							-- create an instance
 
@@ -26,10 +29,17 @@ local c7 = comet:newC({ name = "sprite", sprite = "crab.png", requires = "positi
 
 local c8 = comet:newC("power", { power = 10 }) 																		-- a power component, scales velocity
 
-comet:newC({ name = "controller" }) 																				-- marker component. If you create one for each entity
+local c9 = comet:newC( { name = "effect", effect = "stars", emitterRef = nil, requires = "position,coronaObject",
+						constructor = function(c,e,p) e.emitterRef = Effects.Emitter:new("stars"):start(0,0) e.coronaObject = e.emitterRef.emitter end, 
+						destructor = function(c,e,p) e.emitterRef:remove() end})
+
+
+comet:newC({ name = "controller", requires = "position,velocity,power" }) 											-- marker component. If you create one for each entity
 																													-- that's what you'' get.
 
-for i = 1,53 do 																									-- create lots of entities in a rather haphazard manner.
+local e3 = comet:newE({ x = 160, y = 240 },"effect,controller")
+
+for i = 1,10 do 																									-- create lots of entities in a rather haphazard manner.
 	local e1 = comet:newE({ x = math.random(0,display.contentWidth),y = math.random(0,display.contentHeight), 
 									width = math.random(20,60),height = math.random(20,60),power = math.random(1,10),height = 40 },c4)
 	e1:addC("colour,velocity,controller,power")
@@ -37,8 +47,10 @@ for i = 1,53 do 																									-- create lots of entities in a rather 
 	e1.green = math.random(100)/100
 	e1.blue = math.random(100)/100
 	local s = math.random(30,80)
-	local e2 = comet:newE({ x = math.random(0,display.contentWidth),y = math.random(0,display.contentHeight), power = math.random(1,10),width = s,height = s},"sprite,velocity,controller,power")
+	local e2 = comet:newE({ x = math.random(0,display.contentWidth),y = math.random(0,display.contentHeight), 
+									power = math.random(1,10),width = s,height = s},"sprite,velocity,controller,power")
 end
+
 
 comet:newS("position,coronaObject", function(c,e,s) e.coronaObject.x,e.coronaObject.y = e.x,e.y end) 				-- position/CO system
 comet:newS("size,coronaObject",function(c,e,s) e.coronaObject.width,e.coronaObject.height = e.width,e.height end) 	-- size/CO system
