@@ -26,7 +26,8 @@ function Comet:initialise()
 	self.components = {} 																		-- hash of known components, keyed on the component name.
 	self.entities = {} 																			-- hash of entities, keyed on the entity reference (key = value)
 	self.systems = {} 																			-- array of references to created systems.
-	self.queryCache = { invalidate = function() end }											-- object to notify about component changes (a cache object)
+	self.systemInfo = {} 																		-- information used in systems
+	self.queryCache = nil 																		-- object to notify about component changes (a cache object)
 	self.isAutomatic = false 																	-- true when the RTEL enterFrame is used by this object.
 end
 
@@ -34,10 +35,10 @@ end
 
 function Comet:remove()
 	self:stopAutomatic() 																		-- remove the RTEL if there is one.
-	for _,entity in ipairs(self.entities) do entity:remove() end 								-- remove all the entities
-	for _,system in ipairs(self.systems) do system:remove() end 								-- remove all the systems.
+	for _,entity in pairs(self.entities) do entity:remove() end 								-- remove all the entities
+	for _,system in pairs(self.systems) do system:remove() end 									-- remove all the systems.
 	self.components = nil self.queryCache = nil self.isAutomatic = nil 							-- tidy up.
-	self.entities = nil self.systems = nil
+	self.entities = nil self.systems = nil self.systemInfo = nil
 end 
 
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
@@ -55,7 +56,7 @@ end
 --//	Stop systems from running automatically by calling update on the EnterFrame Runtime Event Listener
 
 function Comet:stopAutomatic()
-		-- TODO
+	-- TODO
 end 
 
 --//%	Convert a string, single instance of component, or list of components or names into a list of components. This is a generic preprocessor
@@ -116,7 +117,7 @@ end
 --//	@comp 	[<components>]	Components either as a CSV list, a list of strings, a component reference, or a list of component references.
 --//	@return [Query]			Reference to query object
 
-function Comet:newS(comp,update,methods)
+function Comet:newQ(comp)
 		-- TODO
 end 
 
@@ -179,7 +180,7 @@ function Component:toString()
 end 
 
 --- ************************************************************************************************************************************************************************
---//								Entity Class. Entities are collections of components that are built as requested.
+--//	Entity Class. Entities are collections of components that are built as requested. Components can be added or removed at will
 --- ************************************************************************************************************************************************************************
 
 Entity = Base:new()
@@ -193,12 +194,14 @@ function Entity:initialise(comet,comp,values)
 	local eInfo = { components = {}, comet = comet, values = values or {} } 					-- list of things stored in the entity.
 	self._eInfo = eInfo  																		-- store appropriately.
 	if comp ~= nil then self:addC(comp) end 													-- add components if provided
+	comet.entities[self] = self 																-- add to comet entities list
 end
 
 --//	Remove the entity components and then mark as removed/
 
 function Entity:remove()
 	for _,comp in pairs(self._eInfo.components) do self:remComponentByReference(comp) end 		-- remove all components.
+	self._eInfo.comet.entities[self] = nil  													-- remove from comet entities list
 	self._eInfo = nil 																			-- remove eInfo to mark it dead.
 end 
 
@@ -235,14 +238,15 @@ function Entity:addComponentByReference(comp)
 				end
 			end
 		end 
-		table = getmetatable(table)
+		table = getmetatable(table) 															-- go to the parent metatable
 	end
 	local req = comp._cInfo.requires 															-- access requires.
 	for i = 1,#req do self:addComponentByReference(req[i]) end 									-- add them recursively.
 	self._eInfo.components[comp] = comp 														-- add to components hash in entity
 	comp._cInfo.entities[self] = self 															-- add to entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount + 1 									-- increment instance count
-	self._eInfo.comet.queryCache:invalidate(comp) 												-- invalidate any cache with this component
+	local qc = self._eInfo.comet.queryCache 													-- access query cache
+	if qc ~= nil then qc:invalidate(comp) end 	 												-- invalidate any cache with this component
 	if comp._cInfo.constructor ~= nil then self:executeMethod(comp._cInfo.constructor,comp) end -- call component constructor
 end 
 
@@ -256,7 +260,8 @@ function Entity:remComponentByReference(comp)
 	self._eInfo.components[comp] = nil 															-- remove from components hash in entity
 	comp._cInfo.entities[self] = nil 															-- remove from entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount - 1 									-- decrement instance count
-	self._eInfo.comet.queryCache:invalidate(comp) 												-- invalidate any cache with this component
+	local qc = self._eInfo.comet.queryCache 													-- access query cache
+	if qc ~= nil then qc:invalidate(comp) end 	 												-- invalidate any cache with this component
 end 
 
 --//	Execute a method in the entity, on a given component. The method is given the entity as its 'self' object. 
@@ -280,19 +285,34 @@ end
 --//	@return 	[Comet]			Owning Comet object
 
 function Entity:getComet()
-	return self._eInfo.comet 
+	return self._eInfo.comet  																	-- return Comet owner reference.
 end 
+
+--//	Get System Information
+--//	@return 	[table]			System Information Table
 
 function Entity:getInfo() 
-	-- TODO
+	return self:getComet().systemInfo 															-- return system information (dt initially)
 end 
+
+--//	Get a table to use for private storage for the component which is current.
+--//	@return 	[table]			Private data store
 
 function Entity:getInstanceData() 
-	-- TODO
+	local comp = self._eInfo.currComponent 														-- access the current component
+	self._eInfo.privateStore = self._eInfo.privateStore or {} 									-- make sure the entity private store exists for this component
+	local ps = self._eInfo.privateStore  														-- short cut
+	ps[comp] = ps[comp] or {} 																	-- make sure the entity has private store for this component
+	return ps[comp]																				-- return it
 end 
 
+--//	Get a table to use for private storage which is shared amongst components.
+--//	@return 	[table]			Private data store
+
 function Entity:getComponentData() 
-	-- TODO
+	local comp = self._eInfo.currComponent 														-- access the current component
+	comp._cInfo.privateStore = comp._cInfo.privateStore or {} 									-- create its private store if required
+	return comp._cInfo.privateStore 															-- return it.
 end 
 
 --//	Convert Entity to String form
@@ -304,6 +324,9 @@ function Entity:toString()
 	return s
 end 
 
+--- ************************************************************************************************************************************************************************
+--- ************************************************************************************************************************************************************************
+
 local C4 = Base:new()
 
 function C4:Hello() print("Hello from C4") end
@@ -311,25 +334,25 @@ C4.xC4 = 1
 
 local C3 = C4:new()
 C3.xC3 = 1
-function C3:constructor() print("C3C",self) self:Hello() print(self:isAlive()) end
-function C3:destructor() print("C3D",self) self:Hello() end
+function C3:constructor() print("C3C",self,self:isAlive(),self:getInstanceData(),self:getComponentData(),self._eInfo) self:Hello() end
+function C3:destructor() print("C3D",self,self:isAlive(),self:getInstanceData(),self:getComponentData()) end
 
 local cm = Comet:new() 
 c0 = cm:newC("c0",{})
 c1 = cm:newC("c1",{ x = 1, y = 2, z = 3, constructor = function(e) print("Con",e) end, destructor = function(e) print("Dst",e) end})
 c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = function(e) print("Demo",e) end, requires = {c0,c1}  })
-c3 = cm:newC("c3",C3)
+c3 = cm:newC("c3",C3:new())
 
-e1 = cm:newE({c2,c3})
-print(c0:toString())
-print(c1:toString())
-print(c2:toString())
-print(c3:toString())
-print(e1:toString())
+e1 = cm:newE({c3})
+e2 = cm:newE({c3})
+e3 = cm:newE({c3})
 
-for k,v in pairs(e1) do print(k,v) end
-e1:remove()
+print(e2:toString())
+
+cm:remove()
 print(e1:isAlive())
 
--- bring back C4, C3 both methods and member variables.
--- TODO: Put specific constructors back in code + docs
+_G.Comet = Comet 
+require("bully")
+
+-- TODO: Query Base
