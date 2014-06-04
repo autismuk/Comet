@@ -11,7 +11,7 @@
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
 
-local Comet, Component, Entity, Query, QueryCache, CachedQuery, System 							-- this to avoid fwd referencing issues.
+local Comet, Component, Entity, Query, QueryCache, System 										-- this to avoid fwd referencing issues.
 
 --- ************************************************************************************************************************************************************************
 --//	The Comet class is a factory class and instance storage class. It can be used to create Components, Entities and Systems, and keeps instance records of the 
@@ -118,7 +118,7 @@ end
 --//	@return [Query]			Reference to query object
 
 function Comet:newQ(comp)
-		-- TODO
+		return Query:new(self,comp)
 end 
 
 --//	Create a new System.
@@ -191,6 +191,7 @@ Entity = Base:new()
 --//	@values [table] 		Hash of initial values of specified data (optional)
 
 function Entity:initialise(comet,comp,values) 
+	assert(comet ~= nil and comet.newC ~= nil,"Bad comet parameter")							-- Validate parameters
 	local eInfo = { components = {}, comet = comet, values = values or {} } 					-- list of things stored in the entity.
 	self._eInfo = eInfo  																		-- store appropriately.
 	if comp ~= nil then self:addC(comp) end 													-- add components if provided
@@ -325,34 +326,83 @@ function Entity:toString()
 end 
 
 --- ************************************************************************************************************************************************************************
+--//	A Query class, that does an 'and' query on the presence of one of more components.
 --- ************************************************************************************************************************************************************************
 
-local C4 = Base:new()
+Query = Base:new()
 
-function C4:Hello() print("Hello from C4") end
-C4.xC4 = 1
+--//	Query constructor
+--//	@comet 	[Comet]			Owning Comet object
+--//	@comp 	[<components>]	Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)
 
-local C3 = C4:new()
-C3.xC3 = 1
-function C3:constructor() print("C3C",self,self:isAlive(),self:getInstanceData(),self:getComponentData(),self._eInfo) self:Hello() end
-function C3:destructor() print("C3D",self,self:isAlive(),self:getInstanceData(),self:getComponentData()) end
+function Query:initialise(comet,comp)
+	assert(comet ~= nil and comet.newC ~= nil,"Bad comet parameter")							-- Validate parameters
+	self.comet = comet 																			-- save comet reference.
+	self.componentList = self.comet:processComponentList(comp) 									-- process the component list.
+	self.components = {} 																		-- components is a hash keyed on the component reference.
+	local names = {}																			-- list of names
+	table.sort(self.componentList,function(c1,c2) return c1._cInfo.name < c2._cInfo.name end) 	-- sort alphabetically on component name.
+	for i = 1,#self.componentList do 															-- scan them all
+		self.components[self.componentList[i]] = self.componentList[i]  						-- set up the existence hash
+		names[i] = self.componentList[i]._cInfo.name 											-- get the name
+	end
+	table.sort(names)																			-- sort the names table, thus the key order doesn't matter.
+	self.queryKey = table.concat(names,":") 													-- build a query key.
+end 
+
+--//	Remove a query.
+
+function Query:remove()
+	self.comet = nil self.componentList = nil self.components = nil
+end
+
+--//	Evaluate a query, using the cache if there is one defined.
+--//	@return [array]		array of entities matching the query.
+
+function Query:evaluate()
+	if #self.componentList == 0 then return {} end 												-- no components provided, so return an empty list.
+	if self.comet.queryCache ~= nil then 														-- anything in the cache
+		local result = self.comet.queryCache:read(self.queryKey) 								-- get it
+		if result ~= nil then return result end 												-- return it if something available.
+	end 
+	table.sort(self.componentList,																-- sort the componenent keys on their instance count
+				function(c1,c2) return c1._cInfo.instanceCount < c2._cInfo.instanceCount end)	-- so we do the one with the fewest keys as an outer.
+	local result = {} 																			-- this is where the query results go.
+	local firstList = self.componentList[1]._cInfo.entities 									-- a hash of the entities using that component.
+	for _,ent1 in pairs(firstList) do 															-- scan through that hash.
+		local canAdd = true 																	-- initially, can add.
+		for i = 2,#self.componentList do 														-- work through the remaining test components
+			if self.componentList[i]._cInfo.entities[ent1] == nil then  						-- if req'd component absence
+				canAdd = false 																	-- then can't add, break loop
+				break
+			end 
+		end
+		if canAdd then result[#result+1] = ent1 end 											-- if everything passed, then add the result.
+	end 
+	if self.comet.queryCache ~= nil then  														-- if the cache is there	
+		self.comet.queryCache:update(self.queryKey,self.components,result) 						-- update it with this new result 
+	end
+	return result
+end 
+
+--- ************************************************************************************************************************************************************************
+--- ************************************************************************************************************************************************************************
 
 local cm = Comet:new() 
 c0 = cm:newC("c0",{})
-c1 = cm:newC("c1",{ x = 1, y = 2, z = 3, constructor = function(e) print("Con",e) end, destructor = function(e) print("Dst",e) end})
-c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = function(e) print("Demo",e) end, requires = {c0,c1}  })
-c3 = cm:newC("c3",C3:new())
+c1 = cm:newC("c1",{ x = 1, y = 2, z = 3})
+c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = function(e) print("Demo",e) end })
+c3 = cm:newC({})
 
-e1 = cm:newE({c3})
-e2 = cm:newE({c3})
-e3 = cm:newE({c3})
+e1 = cm:newE({c3,c1}) e1._name = "e1"
+e2 = cm:newE({c2,c3}) e2._name = "e2"
+e3 = cm:newE({c2,c3}) e3._name = "e3"
+e4 = cm:newE({c2,c1}) e4._name = "e4"
 
-print(e2:toString())
-
+q1 = cm:newQ({c2,c1})
+r = q1:evaluate()
+print(#r) for k,v in pairs(r) do print(v._name) end
 cm:remove()
-print(e1:isAlive())
 
-_G.Comet = Comet 
-require("bully")
+-- _G.Comet = Comet  require("bully")
 
--- TODO: Query Base
