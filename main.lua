@@ -223,15 +223,27 @@ end
 
 function Entity:addComponentByReference(comp)
 	if self._eInfo.components[comp] ~= nil then return end 										-- if it is already present, do nothing
-	print("adding ",comp._cInfo.name)
-	-- TODO add member func/vars, also scanning metatables.
+	--print("adding ",comp._cInfo.name)
+	local table = comp._cInfo.mixins 															-- work through the mixins
+	while table ~= nil do  																		-- until completed
+		for k,v in pairs(table) do  															-- work through this level mixins
+			if k:match("^_") == nil and k ~= "requires" and k ~= "constructor"					-- don't include anything with _, requires, or anything already present.
+												and k ~= "destructor" and self[k] == nil then 	-- or constructors or destructors 				
+				self[k] = v 																	-- add to the entity
+				if type(v) ~= "function" then 													-- if it is not a function 
+					self[k] = self._eInfo.values[k] or v 										-- then the values override it.
+				end
+			end
+		end 
+		table = getmetatable(table)
+	end
 	local req = comp._cInfo.requires 															-- access requires.
 	for i = 1,#req do self:addComponentByReference(req[i]) end 									-- add them recursively.
 	self._eInfo.components[comp] = comp 														-- add to components hash in entity
 	comp._cInfo.entities[self] = self 															-- add to entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount + 1 									-- increment instance count
 	self._eInfo.comet.queryCache:invalidate(comp) 												-- invalidate any cache with this component
-	if self.constructor ~= nil then self:executeMethod("constructor",comp) end 					-- call component constructor
+	if comp._cInfo.constructor ~= nil then self:executeMethod(comp._cInfo.constructor,comp) end -- call component constructor
 end 
 
 --//%	Remove a single component by reference
@@ -239,19 +251,21 @@ end
 
 function Entity:remComponentByReference(comp)
 	assert(self._eInfo.components[comp] ~= nil,"Component not present in entity " .. comp._cInfo.name)
-	print("removing ",comp._cInfo.name)
-	if self.destructor ~= nil then self:executeMethod("destructor",comp) end 					-- call component destructor
+	-- print("removing ",comp._cInfo.name)
+	if comp._cInfo.destructor ~= nil then self:executeMethod(comp._cInfo.destructor,comp) end 	-- call component destructor
 	self._eInfo.components[comp] = nil 															-- remove from components hash in entity
 	comp._cInfo.entities[self] = nil 															-- remove from entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount - 1 									-- decrement instance count
 	self._eInfo.comet.queryCache:invalidate(comp) 												-- invalidate any cache with this component
 end 
 
---//	Execute a method in the entity by name, on a given component. The method is given the entity as its 'self' object. 
+--//	Execute a method in the entity, on a given component. The method is given the entity as its 'self' object. 
+--//	@method 		[function]	method to call
+--//	@component 		[Component]	Component part of entity it is to be used on
 
-function Entity:executeMethod(methodName,component)
+function Entity:executeMethod(method,component)
 	self._eInfo.currComponent = component 														-- identify component being acted on.
-	self[methodName](self) 																		-- call it.
+	method(self) 																				-- call it.
 	self._eInfo.currComponent = nil 															-- clear component being acted on.
 end 
 
@@ -303,7 +317,7 @@ function C3:destructor() print("C3D",self) self:Hello() end
 local cm = Comet:new() 
 c0 = cm:newC("c0",{})
 c1 = cm:newC("c1",{ x = 1, y = 2, z = 3, constructor = function(e) print("Con",e) end, destructor = function(e) print("Dst",e) end})
-c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = {}, requires = {c0,c1}  })
+c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = function(e) print("Demo",e) end, requires = {c0,c1}  })
 c3 = cm:newC("c3",C3)
 
 e1 = cm:newE({c2,c3})
@@ -312,7 +326,10 @@ print(c1:toString())
 print(c2:toString())
 print(c3:toString())
 print(e1:toString())
+
+for k,v in pairs(e1) do print(k,v) end
 e1:remove()
 print(e1:isAlive())
 
 -- bring back C4, C3 both methods and member variables.
+-- TODO: Put specific constructors back in code + docs
