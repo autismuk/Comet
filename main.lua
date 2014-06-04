@@ -44,19 +44,31 @@ end
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
 
 function Comet:update()
-	-- TODO
+	for i = 1,#self.systems do systems:update() end  											-- update all known systems.
+end 
+
+--//%	enterFrame event handler.
+
+function Comet:enterFrame()
+	self:update()
 end 
 
 --//	Make systems run automatically by calling update on the EnterFrame Runtime Event Listener
 
 function Comet:runAutomatic()
-	-- TODO
+	if not self.isAutomatic then 
+		Runtime:addEventListener("enterFrame",self)
+		self.isAutomatic = true
+	end
 end 
 
 --//	Stop systems from running automatically by calling update on the EnterFrame Runtime Event Listener
 
 function Comet:stopAutomatic()
-	-- TODO
+	if self.isAutomatic then 
+		Runtime:removeEventListener("enterFrame",self)
+		self.isAutomatic = false
+	end
 end 
 
 --//%	Convert a string, single instance of component, or list of components or names into a list of components. This is a generic preprocessor
@@ -118,7 +130,7 @@ end
 --//	@return [Query]			Reference to query object
 
 function Comet:newQ(comp)
-		return Query:new(self,comp)
+	return Query:new(self,comp)
 end 
 
 --//	Create a new System.
@@ -128,7 +140,7 @@ end
 --//	@return [System]		Reference to system object
 
 function Comet:newS(comp,update,methods)
-		-- TODO
+	return System:new(self,comp,update,methods)
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -138,7 +150,7 @@ end
 
 Component = Base:new()
 
---//	Component constructor
+--//%	Component constructor
 --//	@comet 	[Comet]			Owning Comet object
 --//	@name 	[String]		Name of component (optional)
 --//	@def 	[table]			Component definition
@@ -265,7 +277,7 @@ function Entity:remComponentByReference(comp)
 	if qc ~= nil then qc:invalidate(comp) end 	 												-- invalidate any cache with this component
 end 
 
---//	Execute a method in the entity, on a given component. The method is given the entity as its 'self' object. 
+--//%	Execute a method in the entity, on a given component. The method is given the entity as its 'self' object. 
 --//	@method 		[function]	method to call
 --//	@component 		[Component]	Component part of entity it is to be used on
 
@@ -337,6 +349,7 @@ Query = Base:new()
 
 function Query:initialise(comet,comp)
 	assert(comet ~= nil and comet.newC ~= nil,"Bad comet parameter")							-- Validate parameters
+	assert(comp ~= nil,"Bad component list for query")
 	self.comet = comet 																			-- save comet reference.
 	self.componentList = self.comet:processComponentList(comp) 									-- process the component list.
 	self.components = {} 																		-- components is a hash keyed on the component reference.
@@ -391,6 +404,8 @@ end
 
 QueryCache = Base:new()
 
+--//%	Query Cache constructor
+
 function QueryCache:initialise()
 	self.results = {} 																			-- query results (text key => result list)
 	self.refersTo = {} 																			-- query parts (text key => table { component => component })
@@ -399,6 +414,7 @@ function QueryCache:initialise()
 	self.hitCount = 0
 end 
 
+--//%	Read an item from the cache if it's there, first checking to see if queries have been invalidated.
 --//	@queryKey	[string]	Text Query Key
 --//	@return 	[table]		Cached query result or nil if none available.
 
@@ -412,6 +428,7 @@ function QueryCache:read(queryKey)
 	return self.results[queryKey] 																-- return a cached query or nil if there is one.
 end 
 
+--//%	Invalidate all queries with a given component
 --//	@component 			[Component]	Reference of a component whose query has become invalid.
 
 function QueryCache:invalidComponent(comp)
@@ -423,7 +440,7 @@ function QueryCache:invalidComponent(comp)
 	end
 end 
 
-
+--//%	Update the query cache with a new result
 --//	@queryKey			[string]	Text Query Key
 --//	@queryComponents	[table]		Hash of components in query (compref => compref)
 --//	@result 			[table]		Result of query
@@ -433,12 +450,37 @@ function QueryCache:update(queryKey,queryComponents,result)
 	self.refersTo[queryKey] = queryComponents 													-- update with result parts.
 end 
 
+--//%	Add an invalidated component to the cache's invalid table.
 --//	@component 			[Component]	Reference of a component whose query has become invalid.
 
 function QueryCache:invalidate(component)
 	self.invalidTable = self.invalidTable or {} 												-- create invalid table if needed.
 	self.invalidTable[component] = component 													-- put the newly invalid component in the invalid table
 end 
+
+--- ************************************************************************************************************************************************************************
+--// Systems are a query with associated methods, those methods are run on the queries at regular intervals.
+--- ************************************************************************************************************************************************************************
+
+System = Base:new()
+
+--//% 	Create a new system, it is automatically added to the system list in the comet object
+--//	@comet 	[Comet]			Owning Comet object
+--//	@query 	[<components>]	Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)
+--//	@update [function]		Update function.
+
+function System:initialise(comet,query,update,methods)
+	assert(comet ~= nil and comet.newC ~= nil,"Bad comet parameter")							-- Validate parameters
+	assert(update ~= nil,"No update function")
+	self.comet = comet  																		-- save the system information,
+	self.query = comet:newQ(query)
+	self.update = update
+	self.methods = methods or {}
+	comet.systems[#comet.systems+1] = self 														-- add system to the systems list.
+end 
+
+function System:update()
+end
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
@@ -457,8 +499,9 @@ e4 = cm:newE({c2,c1}) e4._name = "e4"
 q1 = cm:newQ({c2,c1})
 r = q1:evaluate()
 print(#r) for k,v in pairs(r) do print(v._name) end
+cm:runAutomatic()
 cm:remove()
-
 _G.Comet = Comet  require("bully")
 
 -- TODO Systems
+-- TODO Abstract System

@@ -127,6 +127,6 @@ for i = 1,100*10 do 																								-- lots of times
 	validateQuery() 																								-- check the query gives the correct result
 end
 
-print(comet.queryCache.hitCount/comet.queryCache.queryCount)
+print(math.round(comet.queryCache.hitCount/comet.queryCache.queryCount*100) .. "% hit rate.")						-- how did it do ?
 
 print("Completed")
