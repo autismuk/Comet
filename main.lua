@@ -404,5 +404,5 @@ r = q1:evaluate()
 print(#r) for k,v in pairs(r) do print(v._name) end
 cm:remove()
 
--- _G.Comet = Comet  require("bully")
+_G.Comet = Comet  require("bully")
 

@@ -14,12 +14,14 @@ _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.
 local comet = Comet:new() 																							-- create a component.
 
 local comCount = 100 
-local entCount = 100 												
+local entCount = 100 
+local qryCount = 20 												
 
 local components = {} 																								-- component references.
 local entities = {} 																								-- entity references
 local entComp = {}  																								-- components used in entities (eid => (compref =>compref))
 local compEnt = {} 																									-- entities using components (cid => (entref => entref))
+local queries = {} 																									-- queries.
 
 --- ************************************************************************************************************************************************************************
 
@@ -36,6 +38,15 @@ function changeEntity()
 		entComp[en][components[cn]] = nil 
 		compEnt[cn][entities[en]] = nil
 	end 
+end 
+
+--- ************************************************************************************************************************************************************************
+
+function changeQuery() 
+	local qn = math.random(1,qryCount) 																				-- random query to overwrite
+	query = {} 																										-- pick 1-5 random components
+	for i = 1,math.random(1,4) do query[#query+1] = components[math.random(1,comCount)] end 						-- build a query list
+	queries[qn] = comet:newQ(query) 																				-- create a query
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -61,6 +72,35 @@ end
 
 --- ************************************************************************************************************************************************************************
 
+function evaluateQuery(qry)
+	local result = {}
+	for eid,entity in ipairs(entities) do
+		local ok = true
+		for cid,comp in ipairs(qry) do 
+			ok = ok and (entComp[eid][comp] ~= nil) 
+		end
+		if ok then result[entity] = entity end
+	end 
+	return result
+end 
+
+--- ************************************************************************************************************************************************************************
+
+function validateQuery()
+	for i = 1,qryCount do 																							-- work through all the queries.
+		if queries[i] ~= nil then 	 																				-- if the query is not nil then
+			local actualResult = queries[i]:evaluate() 																-- evaluate the actual result
+			local calcResult = evaluateQuery(queries[i].componentList)
+			assert(#actualResult == tableLen(calcResult))
+			for _,v in ipairs(actualResult) do assert(calcResult[v] ~= nil) end
+		end 
+	end 
+end 
+
+--- ************************************************************************************************************************************************************************
+
+math.randomseed(57)
+
 for i = 1,comCount do 
 	local name = "comp_"..i 																						-- component name
 	local options = {} 																								-- component options (members)
@@ -79,9 +119,12 @@ end
 
 print("Created entities")
 
-for i = 1,1000 do 
-	for j = 1,10 do changeEntity() end
+for i = 1,100*1000 do 
+	if i % 1000 == 0 then print(i) end
+	changeEntity()
+	changeQuery()
 	validateEC()
+	validateQuery()
 end
 
 print("Completed")
