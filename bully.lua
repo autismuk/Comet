@@ -119,12 +119,14 @@ end
 
 print("Created entities")
 
-for i = 1,100*1 do 																									-- lots of times
+for i = 1,100*10 do 																								-- lots of times
 	if i % 1000 == 0 then print(i) end 																				-- report progress
 	changeEntity()																									-- remove/add one component
 	changeQuery()																									-- randomly change one query
 	validateEC() 																									-- check the component and entity records match up
 	validateQuery() 																								-- check the query gives the correct result
 end
+
+print(comet.queryCache.hitCount/comet.queryCache.queryCount)
 
 print("Completed")

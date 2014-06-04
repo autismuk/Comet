@@ -392,25 +392,52 @@ end
 QueryCache = Base:new()
 
 function QueryCache:initialise()
+	self.results = {} 																			-- query results (text key => result list)
+	self.refersTo = {} 																			-- query parts (text key => table { component => component })
+	self.invalidTable = nil 																	-- invalidated components (ref => ref)
+	self.queryCount = 0 																		-- tracking success.
+	self.hitCount = 0
 end 
 
 --//	@queryKey	[string]	Text Query Key
 --//	@return 	[table]		Cached query result or nil if none available.
 
 function QueryCache:read(queryKey)
-	return nil 
+	if self.invalidTable ~= nil then  															-- are there entries in the invalidity table ?
+		for _,comp in pairs(self.invalidTable) do self:invalidComponent(comp) end  				-- for each, invalidate queries with that component in.
+		self.invalidTable = nil 																-- those components have been allowed for, clear invalid table.
+	end 
+	self.queryCount = self.queryCount + 1
+	if self.results[queryKey] ~= nil then self.hitCount = self.hitCount + 1 end
+	return self.results[queryKey] 																-- return a cached query or nil if there is one.
 end 
+
+--//	@component 			[Component]	Reference of a component whose query has become invalid.
+
+function QueryCache:invalidComponent(comp)
+	for key,refers in pairs(self.refersTo) do 
+		if refers[comp] ~= nil then 
+			self.results[key] = nil 
+			self.refersTo[key] = nil
+		end 
+	end
+end 
+
 
 --//	@queryKey			[string]	Text Query Key
 --//	@queryComponents	[table]		Hash of components in query (compref => compref)
 --//	@result 			[table]		Result of query
 
 function QueryCache:update(queryKey,queryComponents,result)
+	self.results[queryKey] = result  															-- update with result
+	self.refersTo[queryKey] = queryComponents 													-- update with result parts.
 end 
 
 --//	@component 			[Component]	Reference of a component whose query has become invalid.
 
 function QueryCache:invalidate(component)
+	self.invalidTable = self.invalidTable or {} 												-- create invalid table if needed.
+	self.invalidTable[component] = component 													-- put the newly invalid component in the invalid table
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -434,3 +461,4 @@ cm:remove()
 
 _G.Comet = Comet  require("bully")
 
+-- TODO Systems
