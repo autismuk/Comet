@@ -119,12 +119,12 @@ end
 
 print("Created entities")
 
-for i = 1,100*1000 do 
-	if i % 1000 == 0 then print(i) end
-	changeEntity()
-	changeQuery()
-	validateEC()
-	validateQuery()
+for i = 1,100*1 do 																									-- lots of times
+	if i % 1000 == 0 then print(i) end 																				-- report progress
+	changeEntity()																									-- remove/add one component
+	changeQuery()																									-- randomly change one query
+	validateEC() 																									-- check the component and entity records match up
+	validateQuery() 																								-- check the query gives the correct result
 end
 
 print("Completed")

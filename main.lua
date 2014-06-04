@@ -27,7 +27,7 @@ function Comet:initialise()
 	self.entities = {} 																			-- hash of entities, keyed on the entity reference (key = value)
 	self.systems = {} 																			-- array of references to created systems.
 	self.systemInfo = {} 																		-- information used in systems
-	self.queryCache = nil 																		-- object to notify about component changes (a cache object)
+	self.queryCache = QueryCache:new() 															-- cache for queries.
 	self.isAutomatic = false 																	-- true when the RTEL enterFrame is used by this object.
 end
 
@@ -383,6 +383,34 @@ function Query:evaluate()
 		self.comet.queryCache:update(self.queryKey,self.components,result) 						-- update it with this new result 
 	end
 	return result
+end 
+
+--- ************************************************************************************************************************************************************************
+--//	Query Cache class, caches query results and tracks them becoming invalid as components are added and removed.
+--- ************************************************************************************************************************************************************************
+
+QueryCache = Base:new()
+
+function QueryCache:initialise()
+end 
+
+--//	@queryKey	[string]	Text Query Key
+--//	@return 	[table]		Cached query result or nil if none available.
+
+function QueryCache:read(queryKey)
+	return nil 
+end 
+
+--//	@queryKey			[string]	Text Query Key
+--//	@queryComponents	[table]		Hash of components in query (compref => compref)
+--//	@result 			[table]		Result of query
+
+function QueryCache:update(queryKey,queryComponents,result)
+end 
+
+--//	@component 			[Component]	Reference of a component whose query has become invalid.
+
+function QueryCache:invalidate(component)
 end 
 
 --- ************************************************************************************************************************************************************************
