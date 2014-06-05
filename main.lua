@@ -29,6 +29,7 @@ function Comet:initialise()
 	self.systemInfo = {} 																		-- information used in systems
 	self.queryCache = QueryCache:new() 															-- cache for queries.
 	self.isAutomatic = false 																	-- true when the RTEL enterFrame is used by this object.
+	self.lastUpdate = 0 																		-- time of last update
 end
 
 --//	Comet close and tidy up.
@@ -44,8 +45,11 @@ end
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
 
 function Comet:update()
-	-- TODO set up systemInfo.
-	for i = 1,#self.systems do systems:runUpdate() end  										-- update all known systems.
+	local currentTime = system.getTimer() 														-- get the current time.
+	self.systemInfo.deltaClock = math.min(100,currentTime - self.lastUpdate)					-- work out deltaClock value (elapsed time in ms)
+	self.systemInfo.deltaTime = self.systemInfo.deltaClock / 1000 								-- work out deltaTime value (elapsed time in s)
+	self.lastUpdate = currentTime 																-- update current time.
+	for i = 1,#self.systems do self.systems[i]:runUpdate() end  								-- update all known systems.
 end 
 
 --//%	enterFrame event handler.
@@ -406,6 +410,13 @@ function Query:evaluate()
 	return result
 end 
 
+--//	Convert a query to a string
+--//	@return 	[string] 	text description of query
+
+function Query:toString()
+	return "[Query] "..tostring(self).." Components:" ..self.queryKey:gsub("%:",",")
+end 
+
 --- ************************************************************************************************************************************************************************
 --//	Query Cache class, caches query results and tracks them becoming invalid as components are added and removed.
 --- ************************************************************************************************************************************************************************
@@ -483,43 +494,75 @@ function System:initialise(comet,query,update,methods)
 	assert(update ~= nil,"No update function")
 	self.comet = comet  																		-- save the system information,
 	self.query = comet:newQ(query)
-	self.update = update
+	self.updateMethod = update
 	self.methods = methods or {}
 	comet.systems[#comet.systems+1] = self 														-- add system to the systems list.
 end 
 
+--//%	Run the update on a system
+
 function System:runUpdate()
-	--TODO Call function to do preProcess
-	--TODO Call update() with list
-	--TODO Call function to do postProcess
+	local result = self.query:evaluate() 														-- calculate the result
+	self:runMethod("preProcess",result) 														-- run before
+	self:update(result) 																		-- update all entities in system
+	self:runMethod("postProcess",result) 														-- run before
+end
+
+--//%	Run a method passing the whole result list as a parameter.
+--//	@methodName 	[string]		Method name to check (checks both as done, and all l/c)
+--//	@result 		[array]			Array of matching entities
+
+function System:runMethod(methodName,result)
+	local mt = self.methods[methodName] or self.methods[methodName:lower()] 					-- check for name and l/c name 
+	if mt ~= nil then mt(result) end 															-- if it exists, run it
+end 
+
+--//%	Update a system using a given entity List
+--//	@entityList 	[array]			Array of matching entities
+
+function System:update(entityList)
+	for i = 1,#entityList do self.updateMethod(entityList[i]) end 
 end
 
 --- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
 
 local cm = Comet:new() 
-c0 = cm:newC("c0",{})
-c1 = cm:newC("c1",{ x = 1, y = 2, z = 3})
-c2 = cm:newC("c2",{ dx = 0,dy = 0, demoMethod = function(e) print("Demo",e) end })
-c3 = cm:newC({})
+c0 = cm:newC("position",{ x = 100,y = 100 })
+c2 = cm:newC("size", {width = 80,height = 70})
+c3 = cm:newC("velocity", { dx = 32, dy = 0 })
+c4 = cm:newC("rotation", { rotation = 45 })
+c5 = cm:newC("rotatespeed", { da = 360 })
 
-e1 = cm:newE({c3,c1}) e1._name = "e1"
-e2 = cm:newE({c2,c3}) e2._name = "e2"
-e3 = cm:newE({c2,c3}) e3._name = "e3"
-e4 = cm:newE({c2,c1}) e4._name = "e4"
+c1 = cm:newC("sprite", { handle = nil, requires = { c0,c2 },
+						 constructor = function(e) e.handle = display.newImage("images/crab.png") end,
+						 destructor = function(e) e.handle:removeSelf() end,
+})
 
-q1 = cm:newQ({c2,c1})
-r = q1:evaluate()
-print(#r) for k,v in pairs(r) do print(v._name) end
+local s1 = cm:newS({c0,c1},function (e) e.handle.x,e.handle.y = e.x,e.y end, { preProcess = function(el) end })
+local s2 = cm:newS({c1,c2},function (e) e.handle.width,e.handle.height = e.width,e.height end)
+
+local s4 = cm:newS({c1,c4},function (e) e.handle.rotation = e.rotation end)
+local s5 = cm:newS({c4,c5}, function(e) e.rotation = e.rotation + e.da*e:getInfo().deltaTime end)
+
+local s3 = cm:newS({c0,c3},function (e)
+	local dt = e:getInfo().deltaTime
+	e.x = e.x + e.dx * dt
+	e.y = e.y + e.dy * dt
+end)
+
+local e1 = cm:newE({c1,c3},{ x = 0,y = 0,dx = 32,dy = 48 }) e1.__name = "e1"
+e1:addC("rotation,rotatespeed")
+print(s1.query:toString())
 cm:runAutomatic()
-cm:remove()
-_G.Comet = Comet  require("bully")
 
--- TODO Set up System Info
--- TODO Write System execution code.
+--_G.Comet = Comet  require("bully")
+
 -- TODO Abstract System
 -- TODO Move to a library
 -- TODO First working test
 -- TODO require("controller")
 -- TODO Make it the main branch.
 -- TODO Creating entities from a JSON.
+-- TODO Timer Components
+
