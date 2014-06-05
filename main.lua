@@ -83,6 +83,7 @@ cm:newS("controller,velocity,speed", 															-- a system which sets veloc
 			end
 	end)
 
+
 for i = 1,30 do 																				-- create some crabs that rotate, move and are controllable
 	local e = cm:newE({c1,c3,"rotation","rotatespeed"},
 				{ x = math.random(320),y = math.random(480),dx = math.random(32,128),dy = math.random(32,160),da = math.random(-360,360), speed = math.random(1,250) }) e.__name = "e"..i

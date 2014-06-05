@@ -30,26 +30,33 @@ function Comet:initialise()
 	self.queryCache = QueryCache:new() 															-- cache for queries.
 	self.isAutomatic = false 																	-- true when the RTEL enterFrame is used by this object.
 	self.lastUpdate = 0 																		-- time of last update
+	self.terminate = false 																		-- should Comet terminate itself ?
+	self.inUpdate = false 																		-- true when updating.
 end
 
 --//	Comet close and tidy up.
 
 function Comet:remove()
+	if self.inUpdate then self.terminate = true return end 										-- if updating terminate after we have finished.
 	self:stopAutomatic() 																		-- remove the RTEL if there is one.
 	for _,entity in pairs(self.entities) do entity:remove() end 								-- remove all the entities
 	for _,system in pairs(self.systems) do system:remove() end 									-- remove all the systems.
 	self.components = nil self.queryCache = nil self.isAutomatic = nil 							-- tidy up.
-	self.entities = nil self.systems = nil self.systemInfo = nil
+	self.entities = nil self.systems = nil self.systemInfo = nil self.terminate = nil
+	self.inUpdate = nil
 end 
 
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
 
 function Comet:update()
+	self.inUpdate = true 																		-- we are updating
 	local currentTime = system.getTimer() 														-- get the current time.
 	self.systemInfo.deltaClock = math.min(100,currentTime - self.lastUpdate)					-- work out deltaClock value (elapsed time in ms)
 	self.systemInfo.deltaTime = self.systemInfo.deltaClock / 1000 								-- work out deltaTime value (elapsed time in s)
 	self.lastUpdate = currentTime 																-- update current time.
 	for i = 1,#self.systems do self.systems[i]:runUpdate() end  								-- update all known systems.
+	self.inUpdate = false 																		-- no longer updating.
+	if self.terminate then self:remove() end 													-- if terminated during this then remove itself.
 end 
 
 --//%	enterFrame event handler.
@@ -173,6 +180,8 @@ end
 
 Component = Base:new()
 
+Component.reservedMixins = { requires = 1, constructor = 1, destructor = 1 }					-- known reserved mixin words.
+
 --//%	Component constructor
 --//	@comet 	[Comet]			Owning Comet object
 --//	@name 	[String]		Name of component (optional)
@@ -193,6 +202,16 @@ function Component:initialise(comet,name,def)
 	self._cInfo.constructor = def.constructor  													-- copy constructor, destructor, requires into the info structure.
 	self._cInfo.destructor = def.destructor 
 	self._cInfo.requires = comet:processComponentList(def.requires) 							-- create requires list entry.
+	for cname,ref in pairs(comet.components) do 												-- check through all known components
+		for key,value in pairs(def) do  														-- for every key,value members in the new mixin
+			if ref._cInfo.mixins[key] ~= nil then  												-- if that key is present in the known components mixins
+				if Component.reservedMixins[key] == nil then 									-- is it a reserved mixin - constructor, destructor etc.
+					print("Warning:Member "..key.." has been found in '"..						-- if not, then print a non-fatal warning.
+															name.."' and '"..cname.."'") 					
+				end
+			end
+		end
+	end
 	comet.components[name] = self 																-- store in the component hash, keyed on the name.
 end
 
@@ -411,16 +430,18 @@ function Query:evaluate()
 	table.sort(self.componentList,																-- sort the componenent keys on their instance count
 				function(c1,c2) return c1._cInfo.instanceCount < c2._cInfo.instanceCount end)	-- so we do the one with the fewest keys as an outer.
 	local result = {} 																			-- this is where the query results go.
-	local firstList = self.componentList[1]._cInfo.entities 									-- a hash of the entities using that component.
-	for _,ent1 in pairs(firstList) do 															-- scan through that hash.
-		local canAdd = true 																	-- initially, can add.
-		for i = 2,#self.componentList do 														-- work through the remaining test components
-			if self.componentList[i]._cInfo.entities[ent1] == nil then  						-- if req'd component absence
-				canAdd = false 																	-- then can't add, break loop
-				break
-			end 
+	if self.componentList[1]._cInfo.instanceCount > 0 then  									-- if the list is not empty, then....
+		local firstList = self.componentList[1]._cInfo.entities 								-- a hash of the entities using that component.
+		for _,ent1 in pairs(firstList) do 														-- scan through that hash.
+			local canAdd = true 																-- initially, can add.
+			for i = 2,#self.componentList do 													-- work through the remaining test components
+				if self.componentList[i]._cInfo.entities[ent1] == nil then  					-- if req'd component absence
+					canAdd = false 																-- then can't add, break loop
+					break
+				end 
+			end
+			if canAdd then result[#result+1] = ent1 end 										-- if everything passed, then add the result.
 		end
-		if canAdd then result[#result+1] = ent1 end 											-- if everything passed, then add the result.
 	end 
 	if self.comet.queryCache ~= nil then  														-- if the cache is there	
 		self.comet.queryCache:update(self.queryKey,self.components,result) 						-- update it with this new result 
@@ -469,9 +490,9 @@ end
 --//	@component 			[Component]	Reference of a component whose query has become invalid.
 
 function QueryCache:invalidComponent(comp)
-	for key,refers in pairs(self.refersTo) do 
-		if refers[comp] ~= nil then 
-			self.results[key] = nil 
+	for key,refers in pairs(self.refersTo) do 													-- check all refers to entries for this component reference 
+		if refers[comp] ~= nil then  															-- if found
+			self.results[key] = nil 															-- kill the cache entry.
 			self.refersTo[key] = nil
 		end 
 	end
@@ -574,7 +595,10 @@ end
 
 return Comet 
 
+--- ************************************************************************************************************************************************************************
+--//	This is a class which instantiates standard components.
+--- ************************************************************************************************************************************************************************
+
 -- TODO Creating entities from a JSON.
--- TODO Timer Components
--- TODO Method to remove Comet from within Comet (can't use remove)
+-- TODO Timer Components, standard colour components.
 
