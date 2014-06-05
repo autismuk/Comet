@@ -1,0 +1,202 @@
+<!DOCTYPE html><html><head><style>body { background:#333; color:#0F0; font-family:Arial,Verdana;} a { color:#0AA } h1 { color:#FF0; } h2 { color:#0FF } table,tr,td { color: #CCC; padding:4px;border:1px solid white; border-collapse:collapse; }</style></head><body>
+<a name="AbstractSystemClass"></a>
+<hr><h1>AbstractSystemClass</h1>
+<p><h3>Extends System</h3></p>
+<p>This is a system which you can create by subclassing.</p>
+<p>Methods : <a href="#AbstractSystemClass_update"/>update</a></p><hr><a name="AbstractSystemClass_(constructor)"></a>
+<a name="AbstractSystemClass_update"></a>
+<h2>update(entityList)</h2>
+<table>
+<tr><td>entityList</td><td>array</td><td>Array of entity lists.</td></tr>
+</table>
+<p>This is the method that must be subclassed if you use Abstract System Classes.</p>
+<a name="Cache"></a>
+<hr><h1>Cache</h1>
+<p><h3>Extends QueryCache</h3></p>
+<p></p>
+<p>Methods : </p><hr><a name="Comet"></a>
+<hr><h1>Comet</h1>
+<p><h3>Extends Base</h3></p>
+<p>The Comet class is a factory class and instance storage class. It can be used to create Components, Entities and Systems, and keeps instance records of the various things so that they can be accessed easily.</p>
+<p>Methods : <a href="#Comet_(constructor)"/>(constructor)</a>,<a href="#Comet_getSystemClass"/>getSystemClass</a>,<a href="#Comet_newC"/>newC</a>,<a href="#Comet_newE"/>newE</a>,<a href="#Comet_newQ"/>newQ</a>,<a href="#Comet_newS"/>newS</a>,<a href="#Comet_remove"/>remove</a>,<a href="#Comet_runAutomatic"/>runAutomatic</a>,<a href="#Comet_stopAutomatic"/>stopAutomatic</a>,<a href="#Comet_update"/>update</a></p><hr><a name="Comet_(constructor)"></a>
+<h2>(constructor)()</h2>
+<p>Comet constructor.</p>
+<a name="Comet_enterFrame"></a>
+<a name="Comet_getSystemClass"></a>
+<h2>getSystemClass()</h2>
+<table>
+<tr><td>return</td><td>Class</td><td>Class which can be subclassed to create a system class.</td></tr>
+</table>
+<p>Get a base class for creating System classes</p>
+<a name="Comet_newC"></a>
+<h2>newC(name,def)</h2>
+<table>
+<tr><td>name</td><td>string</td><td>Component name, optional. If not present will be given an arbitrary name.</td></tr>
+<tr><td>def</td><td>table/class</td><td>Component Definition</td></tr>
+<tr><td>return</td><td>component</td><td>Reference to component.</td></tr>
+</table>
+<p>Create a new component using the given name (optional) and definition.The definition is a class or table containing member values for the component, functions for the component, and optionally may contain constructors, destructors and a requires list.</p>
+<a name="Comet_newE"></a>
+<h2>newE(comp,values)</h2>
+<table>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references.</td></tr>
+<tr><td>values</td><td>table</td><td>Hash of initial values of specified data (optional)</td></tr>
+<tr><td>return</td><td>entity</td><td>A new entity object.</td></tr>
+</table>
+<p>Create a new entity, using the optional components list given.</p>
+<a name="Comet_newQ"></a>
+<h2>newQ(comp)</h2>
+<table>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references.</td></tr>
+<tr><td>return</td><td>Query</td><td>Reference to query object</td></tr>
+</table>
+<p>Create a new Query.</p>
+<a name="Comet_newS"></a>
+<h2>newS(comp,update,methods)</h2>
+<table>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references.</td></tr>
+<tr><td>update</td><td>function</td><td>Update function.</td></tr>
+<tr><td>methods</td><td>table</td><td>Table of other methods</td></tr>
+<tr><td>return</td><td>System</td><td>Reference to system object</td></tr>
+</table>
+<p>Create a new System.</p>
+<a name="Comet_processComponentList"></a>
+<a name="Comet_remove"></a>
+<h2>remove()</h2>
+<p>Comet close and tidy up.</p>
+<a name="Comet_runAutomatic"></a>
+<h2>runAutomatic()</h2>
+<p>Make systems run automatically by calling update on the EnterFrame Runtime Event Listener</p>
+<a name="Comet_stopAutomatic"></a>
+<h2>stopAutomatic()</h2>
+<p>Stop systems from running automatically by calling update on the EnterFrame Runtime Event Listener</p>
+<a name="Comet_update"></a>
+<h2>update()</h2>
+<p>Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.</p>
+<a name="Component"></a>
+<hr><h1>Component</h1>
+<p><h3>Extends Base</h3></p>
+<p>Component class. A component class is a bag of data with optional methods that operate on that data, additionally a component can have a constructor, destructor and private memory (per instance or per component)</p>
+<p>Methods : <a href="#Component_toString"/>toString</a></p><hr><a name="Component_(constructor)"></a>
+<a name="Component_toString"></a>
+<h2>toString()</h2>
+<table>
+<tr><td>return</td><td>string</td><td>String representation of component.</td></tr>
+</table>
+<p>Convert component definition to string, for debugging</p>
+<a name="Entity"></a>
+<hr><h1>Entity</h1>
+<p><h3>Extends Base</h3></p>
+<p>Entity Class. Entities are collections of components that are built as requested. Components can be added or removed at will</p>
+<p>Methods : <a href="#Entity_(constructor)"/>(constructor)</a>,<a href="#Entity_addC"/>addC</a>,<a href="#Entity_getComet"/>getComet</a>,<a href="#Entity_getComponentData"/>getComponentData</a>,<a href="#Entity_getCreateValues"/>getCreateValues</a>,<a href="#Entity_getInfo"/>getInfo</a>,<a href="#Entity_getInstanceData"/>getInstanceData</a>,<a href="#Entity_isAlive"/>isAlive</a>,<a href="#Entity_remC"/>remC</a>,<a href="#Entity_remove"/>remove</a>,<a href="#Entity_toString"/>toString</a></p><hr><a name="Entity_(constructor)"></a>
+<h2>(constructor)(comet,comp,values)</h2>
+<table>
+<tr><td>comet</td><td>Comet</td><td>Owning Comet object</td></tr>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)</td></tr>
+<tr><td>values</td><td>table</td><td>Hash of initial values of specified data (optional)</td></tr>
+</table>
+<p>Entity constructor</p>
+<a name="Entity_addC"></a>
+<h2>addC(comp)</h2>
+<table>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references.</td></tr>
+</table>
+<p>Add a component or components to the entity</p>
+<a name="Entity_addComponentByReference"></a>
+<a name="Entity_executeMethod"></a>
+<a name="Entity_getComet"></a>
+<h2>getComet()</h2>
+<table>
+<tr><td>return</td><td>Comet</td><td>Owning Comet object</td></tr>
+</table>
+<p>Get Comet Reference used by this Entity</p>
+<a name="Entity_getComponentData"></a>
+<h2>getComponentData()</h2>
+<table>
+<tr><td>return</td><td>table</td><td>Private data store</td></tr>
+</table>
+<p>Get a table to use for private storage which is shared amongst components.</p>
+<a name="Entity_getCreateValues"></a>
+<h2>getCreateValues()</h2>
+<table>
+<tr><td>return</td><td>table</td><td>table of names => values</td></tr>
+</table>
+<p>Retrieve the values used when constructing the entity.</p>
+<a name="Entity_getInfo"></a>
+<h2>getInfo()</h2>
+<table>
+<tr><td>return</td><td>table</td><td>System Information Table</td></tr>
+</table>
+<p>Get System Information</p>
+<a name="Entity_getInstanceData"></a>
+<h2>getInstanceData()</h2>
+<table>
+<tr><td>return</td><td>table</td><td>Private data store</td></tr>
+</table>
+<p>Get a table to use for private storage for the component which is current.</p>
+<a name="Entity_isAlive"></a>
+<h2>isAlive()</h2>
+<table>
+<tr><td>return</td><td>boolean</td><td>true if still alive</td></tr>
+</table>
+<p>Check to see if the entity has not been removed - removed entities can appear if entities have been removed in updates</p>
+<a name="Entity_remC"></a>
+<h2>remC(comp)</h2>
+<table>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references.</td></tr>
+</table>
+<p>Remove a component or components from the entity</p>
+<a name="Entity_remComponentByReference"></a>
+<a name="Entity_remove"></a>
+<h2>remove()</h2>
+<p>Remove the entity components and then mark as removed/</p>
+<a name="Entity_toString"></a>
+<h2>toString()</h2>
+<table>
+<tr><td>return</td><td>string</td><td>entity as string.</td></tr>
+</table>
+<p>Convert Entity to String form</p>
+<a name="Query"></a>
+<hr><h1>Query</h1>
+<p><h3>Extends Base</h3></p>
+<p>A Query class, that does an 'and' query on the presence of one of more components.</p>
+<p>Methods : <a href="#Query_(constructor)"/>(constructor)</a>,<a href="#Query_evaluate"/>evaluate</a>,<a href="#Query_remove"/>remove</a>,<a href="#Query_toString"/>toString</a></p><hr><a name="Query_(constructor)"></a>
+<h2>(constructor)(comet,comp)</h2>
+<table>
+<tr><td>comet</td><td>Comet</td><td>Owning Comet object</td></tr>
+<tr><td>comp</td><td><components></td><td>Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)</td></tr>
+</table>
+<p>Query constructor</p>
+<a name="Query_evaluate"></a>
+<h2>evaluate()</h2>
+<table>
+<tr><td>return</td><td>array</td><td>array of entities matching the query.</td></tr>
+</table>
+<p>Evaluate a query, using the cache if there is one defined.</p>
+<a name="Query_remove"></a>
+<h2>remove()</h2>
+<p>Remove a query.</p>
+<a name="Query_toString"></a>
+<h2>toString()</h2>
+<table>
+<tr><td>return</td><td>string</td><td>text description of query</td></tr>
+</table>
+<p>Convert a query to a string</p>
+<a name="QueryCache"></a>
+<hr><h1>QueryCache</h1>
+<p><h3>Extends Base</h3></p>
+<p>Query Cache class, caches query results and tracks them becoming invalid as components are added and removed.</p>
+<p>Methods : </p><hr><a name="QueryCache_(constructor)"></a>
+<a name="QueryCache_invalidComponent"></a>
+<a name="QueryCache_invalidate"></a>
+<a name="QueryCache_read"></a>
+<a name="QueryCache_update"></a>
+<a name="System"></a>
+<hr><h1>System</h1>
+<p><h3>Extends Base</h3></p>
+<p>Systems are a query with associated methods, those methods are run on the queries at regular intervals. This can be done individually, as a group, or automatically via a runtime event listener attached to the comet object.</p>
+<p>Methods : </p><hr><a name="System_(constructor)"></a>
+<a name="System_runMethod"></a>
+<a name="System_runUpdate"></a>
+<a name="System_update"></a>
+<hr><p><i>LUA Autodoc by Paul Robson 2014</i></p><hr></body></html>
