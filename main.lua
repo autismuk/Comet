@@ -44,7 +44,8 @@ end
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
 
 function Comet:update()
-	for i = 1,#self.systems do systems:update() end  											-- update all known systems.
+	-- TODO set up systemInfo.
+	for i = 1,#self.systems do systems:runUpdate() end  										-- update all known systems.
 end 
 
 --//%	enterFrame event handler.
@@ -254,12 +255,12 @@ function Entity:addComponentByReference(comp)
 		table = getmetatable(table) 															-- go to the parent metatable
 	end
 	local req = comp._cInfo.requires 															-- access requires.
-	for i = 1,#req do self:addComponentByReference(req[i]) end 									-- add them recursively.
 	self._eInfo.components[comp] = comp 														-- add to components hash in entity
 	comp._cInfo.entities[self] = self 															-- add to entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount + 1 									-- increment instance count
 	local qc = self._eInfo.comet.queryCache 													-- access query cache
 	if qc ~= nil then qc:invalidate(comp) end 	 												-- invalidate any cache with this component
+	for i = 1,#req do self:addComponentByReference(req[i]) end 									-- add them recursively (here to stop recursion loop)
 	if comp._cInfo.constructor ~= nil then self:executeMethod(comp._cInfo.constructor,comp) end -- call component constructor
 end 
 
@@ -326,6 +327,13 @@ function Entity:getComponentData()
 	local comp = self._eInfo.currComponent 														-- access the current component
 	comp._cInfo.privateStore = comp._cInfo.privateStore or {} 									-- create its private store if required
 	return comp._cInfo.privateStore 															-- return it.
+end 
+
+--//	Retrieve the values used when constructing the entity.
+--//	@return 	[table]			table of names => values
+
+function Entity:getCreateValues()
+	return self._eInfo.values 
 end 
 
 --//	Convert Entity to String form
@@ -459,7 +467,8 @@ function QueryCache:invalidate(component)
 end 
 
 --- ************************************************************************************************************************************************************************
---// Systems are a query with associated methods, those methods are run on the queries at regular intervals.
+--// Systems are a query with associated methods, those methods are run on the queries at regular intervals. This can be done individually, as a group, or automatically
+--// via a runtime event listener attached to the comet object.
 --- ************************************************************************************************************************************************************************
 
 System = Base:new()
@@ -479,7 +488,10 @@ function System:initialise(comet,query,update,methods)
 	comet.systems[#comet.systems+1] = self 														-- add system to the systems list.
 end 
 
-function System:update()
+function System:runUpdate()
+	--TODO Call function to do preProcess
+	--TODO Call update() with list
+	--TODO Call function to do postProcess
 end
 
 --- ************************************************************************************************************************************************************************
@@ -503,5 +515,11 @@ cm:runAutomatic()
 cm:remove()
 _G.Comet = Comet  require("bully")
 
--- TODO Systems
+-- TODO Set up System Info
+-- TODO Write System execution code.
 -- TODO Abstract System
+-- TODO Move to a library
+-- TODO First working test
+-- TODO require("controller")
+-- TODO Make it the main branch.
+-- TODO Creating entities from a JSON.
