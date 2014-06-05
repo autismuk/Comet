@@ -11,7 +11,7 @@
 -- Standard OOP (with Constructor parameters added.)
 _G.Base =  _G.Base or { new = function(s,...) local o = { } setmetatable(o,s) s.__index = s o:initialise(...) return o end, initialise = function() end }
 
-local Comet, Component, Entity, Query, QueryCache, System 										-- this to avoid fwd referencing issues.
+local Comet, Component, Entity, Query, QueryCache, System, AbstractSystemClass 					-- this to avoid fwd referencing issues.
 
 --- ************************************************************************************************************************************************************************
 --//	The Comet class is a factory class and instance storage class. It can be used to create Components, Entities and Systems, and keeps instance records of the 
@@ -146,6 +146,13 @@ end
 
 function Comet:newS(comp,update,methods)
 	return System:new(self,comp,update,methods)
+end 
+
+--//	Get a base class for creating System classes
+--//	@return [Class]			Class which can be subclassed to create a system class.
+
+function Comet:getSystemClass()
+	return AbstractSystemClass 
 end 
 
 --- ************************************************************************************************************************************************************************
@@ -488,8 +495,10 @@ System = Base:new()
 --//	@comet 	[Comet]			Owning Comet object
 --//	@query 	[<components>]	Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)
 --//	@update [function]		Update function.
+--//	@methods[table] 		Table of system methods that are available
 
 function System:initialise(comet,query,update,methods)
+	if comet == nil then return end 															-- used as prototype.
 	assert(comet ~= nil and comet.newC ~= nil,"Bad comet parameter")							-- Validate parameters
 	assert(update ~= nil,"No update function")
 	self.comet = comet  																		-- save the system information,
@@ -525,6 +534,28 @@ function System:update(entityList)
 end
 
 --- ************************************************************************************************************************************************************************
+--//	This is a system which you can create by subclassing.
+--- ************************************************************************************************************************************************************************
+
+AbstractSystemClass = System:new()
+
+--//% 	Create a new system, it is automatically added to the system list in the comet object
+--//	@comet 	[Comet]			Owning Comet object
+--//	@query 	[<components>]	Components either as a CSV list, a list of strings, a component reference, or a list of component references (optional)
+--//	@methods[table] 		Table of system methods that are available
+
+function AbstractSystemClass:initialise(comet,query,methods)
+	System.initialise(self,comet,query,self.update,methods) 									-- call super constructor with self.update as the update method.
+end 
+
+--//	This is the method that must be subclassed if you use Abstract System Classes.
+--//	@entityList [array]		Array of entity lists.
+
+function AbstractSystemClass:update(entityList)
+	error("AbstractSystemClass is abstract and must be subclassed")
+end 
+
+--- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
 
 local cm = Comet:new() 
@@ -543,12 +574,23 @@ local s1 = cm:newS({c0,c1},function (e) e.handle.x,e.handle.y = e.x,e.y end, { p
 local s2 = cm:newS({c1,c2},function (e) e.handle.width,e.handle.height = e.width,e.height end)
 
 local s4 = cm:newS({c1,c4},function (e) e.handle.rotation = e.rotation end)
-local s5 = cm:newS({c4,c5}, function(e) e.rotation = e.rotation + e.da*e:getInfo().deltaTime end)
+
+ClassS5 = cm:getSystemClass():new()
+function ClassS5:update(entityList)
+	local dt = entityList[1]:getInfo().deltaTime
+	for i = 1,#entityList do 
+		local e = entityList[i]
+		e.rotation = e.rotation + e.da * dt
+	end 
+end 
+
+ClassS5:new(cm,{c4,c5})
 
 local s3 = cm:newS({c0,c3},function (e)
 	local dt = e:getInfo().deltaTime
 	e.x = e.x + e.dx * dt
 	e.y = e.y + e.dy * dt
+	if e.x < 0 or e.y < 0 or e.x > 320 or e.y > 480 then e.dx = -e.dx e.dy = -e.dy end
 end)
 
 local e1 = cm:newE({c1,c3},{ x = 0,y = 0,dx = 32,dy = 48 }) e1.__name = "e1"
@@ -558,7 +600,6 @@ cm:runAutomatic()
 
 --_G.Comet = Comet  require("bully")
 
--- TODO Abstract System
 -- TODO Move to a library
 -- TODO First working test
 -- TODO require("controller")
