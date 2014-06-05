@@ -24,9 +24,9 @@ local Controller = Base:new()
 
 function Controller:initialise(x,y,r)
 	if x == nil then 														-- if no prarameters supplied put in bottom right
-		r = display.contentWidth / 3
-		x = display.contentWidth - 20 - r
-		y = display.contentHeight - 20 - r
+		r = display.contentWidth / 5
+		x = display.contentWidth - 10 - r
+		y = display.contentHeight - 10 - r
 	end
 	self.group = display.newGroup() 										-- this group contains all objects
 	self.group.x, self.group.y = x,y  										-- move to the middle

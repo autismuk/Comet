@@ -148,6 +148,17 @@ function Comet:newS(comp,update,methods)
 	return System:new(self,comp,update,methods)
 end 
 
+--//	Install an external library. The library should return an object with three methods, installComponents, installEntities and installSystems
+--//	that take a comet object as a parameter.
+--//	@luaFile	[string]	Lua file name in require() format (e.g. "system.demo" ==> system/demo.lua)
+
+function Comet:newL(luaFile)
+	local src = require(luaFile)
+	if src.installComponents ~= nil then src:installComponents(self) end
+	if src.installEntities ~= nil then src:installEntities(self) end
+	if src.installSystems ~= nil then src:installSystems(self) end
+end 
+
 --//	Get a base class for creating System classes
 --//	@return [Class]			Class which can be subclassed to create a system class.
 
@@ -508,6 +519,12 @@ function System:initialise(comet,query,update,methods)
 	comet.systems[#comet.systems+1] = self 														-- add system to the systems list.
 end 
 
+--//%	Private system remove - does not tidy the table in the comet object, don't use it.
+
+function System:remove()
+	self.comet = nil self.query = nil self.updateMethod = nil self.methods = nil 
+end 
+
 --//%	Run the update on a system
 
 function System:runUpdate()
@@ -557,7 +574,7 @@ end
 
 return Comet 
 
--- TODO require("controller")
--- TODO Make it the main branch.
 -- TODO Creating entities from a JSON.
 -- TODO Timer Components
+-- TODO Method to remove Comet from within Comet (can't use remove)
+

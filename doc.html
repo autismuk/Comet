@@ -18,7 +18,7 @@
 <hr><h1>Comet</h1>
 <p><h3>Extends Base</h3></p>
 <p>The Comet class is a factory class and instance storage class. It can be used to create Components, Entities and Systems, and keeps instance records of the various things so that they can be accessed easily.</p>
-<p>Methods : <a href="#Comet_(constructor)"/>(constructor)</a>,<a href="#Comet_getSystemClass"/>getSystemClass</a>,<a href="#Comet_newC"/>newC</a>,<a href="#Comet_newE"/>newE</a>,<a href="#Comet_newQ"/>newQ</a>,<a href="#Comet_newS"/>newS</a>,<a href="#Comet_remove"/>remove</a>,<a href="#Comet_runAutomatic"/>runAutomatic</a>,<a href="#Comet_stopAutomatic"/>stopAutomatic</a>,<a href="#Comet_update"/>update</a></p><hr><a name="Comet_(constructor)"></a>
+<p>Methods : <a href="#Comet_(constructor)"/>(constructor)</a>,<a href="#Comet_getSystemClass"/>getSystemClass</a>,<a href="#Comet_newC"/>newC</a>,<a href="#Comet_newE"/>newE</a>,<a href="#Comet_newL"/>newL</a>,<a href="#Comet_newQ"/>newQ</a>,<a href="#Comet_newS"/>newS</a>,<a href="#Comet_remove"/>remove</a>,<a href="#Comet_runAutomatic"/>runAutomatic</a>,<a href="#Comet_stopAutomatic"/>stopAutomatic</a>,<a href="#Comet_update"/>update</a></p><hr><a name="Comet_(constructor)"></a>
 <h2>(constructor)()</h2>
 <p>Comet constructor.</p>
 <a name="Comet_enterFrame"></a>
@@ -44,6 +44,12 @@
 <tr><td>return</td><td>entity</td><td>A new entity object.</td></tr>
 </table>
 <p>Create a new entity, using the optional components list given.</p>
+<a name="Comet_newL"></a>
+<h2>newL(luaFile)</h2>
+<table>
+<tr><td>luaFile</td><td>string</td><td>Lua file name in require() format (e.g. "system.demo" ==> system/demo.lua)</td></tr>
+</table>
+<p>Install an external library. The library should return an object with three methods, installComponents, installEntities and installSystems that take a comet object as a parameter.</p>
 <a name="Comet_newQ"></a>
 <h2>newQ(comp)</h2>
 <table>
@@ -196,6 +202,7 @@
 <p><h3>Extends Base</h3></p>
 <p>Systems are a query with associated methods, those methods are run on the queries at regular intervals. This can be done individually, as a group, or automatically via a runtime event listener attached to the comet object.</p>
 <p>Methods : </p><hr><a name="System_(constructor)"></a>
+<a name="System_remove"></a>
 <a name="System_runMethod"></a>
 <a name="System_runUpdate"></a>
 <a name="System_update"></a>
