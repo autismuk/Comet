@@ -38,7 +38,7 @@ function ClassS5:update(entityList) 															-- get elapsed delta time
 	local dt = entityList[1]:getInfo().deltaTime
 	for i = 1,#entityList do  																	-- work through the entity list
 		local e = entityList[i]
-		e.rotation = e.rotation + e.da * dt 													-- apply the rotation adjusted for time.
+		if e:isAlive() then e.rotation = e.rotation + e.da * dt end								-- apply the rotation adjusted for time.
 	end 
 end 
 
@@ -48,6 +48,7 @@ local s3 = cm:newS({c0,c3},function (e) 														-- a system which changes 
 	local dt = e:getInfo().deltaTime
 	e.x = e.x + e.dx * dt
 	e.y = e.y + e.dy * dt
+	-- if e.x < 30 then e:remove() end
 end)
 
 local Controller = require("utilities.Controller") 												-- a class which does a touch controller
@@ -94,5 +95,5 @@ end
 cm:runAutomatic() 																				-- and let them go !
 --cm:remove()
 --_G.Comet = Comet  require("bully")
-
+-- TODO: Particle explosion on off left.
 

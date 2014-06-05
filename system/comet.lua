@@ -568,7 +568,9 @@ end
 --//	@entityList 	[array]			Array of matching entities
 
 function System:update(entityList)
-	for i = 1,#entityList do self.updateMethod(entityList[i]) end 
+	for i = 1,#entityList do 																	-- scan through the list
+		if entityList[i]:isAlive() then self.updateMethod(entityList[i]) end  					-- it is possible to delete entities in the list, so check alive.
+	end
 end
 
 --- ************************************************************************************************************************************************************************
@@ -600,5 +602,9 @@ return Comet
 --- ************************************************************************************************************************************************************************
 
 -- TODO Creating entities from a JSON.
--- TODO Timer Components, standard colour components.
-
+-- TODO Timer Components, simple and complex.
+-- TODO Broadcast messaging system.
+-- TODO Standard colour components, position, velocity, size, anchor , coronaobject
+-- TODO Collision (Spacial)
+-- TODO Endless, Long particle effects
+-- TODO Some Corona Objects
