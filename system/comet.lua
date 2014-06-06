@@ -1,4 +1,5 @@
 --- ************************************************************************************************************************************************************************
+--- ************************************************************************************************************************************************************************
 ---
 ---				Name : 		comet.lua
 ---				Purpose :	COMET (Component/Entity Framework for Corona/Lua), version 4
@@ -6,6 +7,7 @@
 ---				Author:		Paul Robson (paul@robsons.org.uk)
 ---				License:	MIT
 ---
+--- ************************************************************************************************************************************************************************
 --- ************************************************************************************************************************************************************************
 
 -- Standard OOP (with Constructor parameters added.)
@@ -601,10 +603,17 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
--- TODO Creating entities from a JSON.
+-- TODO Store members in a sub component
+-- TODO Remove instance specific data.
+-- TODO Remove member collision check, now not required.
+-- TODO Components must have proper names for access (lua compatible)
+-- TODO Update the main.lua
+-- TODO Creating entities from a JSON 
+-- TODO Collision (Rough)
+-- TODO ext to reserved words.
 -- TODO Timer Components, simple and complex.
--- TODO Broadcast messaging system.
+-- TODO Broadcast messaging system (listener)
 -- TODO Standard colour components, position, velocity, size, anchor , coronaobject
--- TODO Collision (Spacial)
 -- TODO Endless, Long particle effects
 -- TODO Some Corona Objects
+-- TODO Collision (Spatial)
