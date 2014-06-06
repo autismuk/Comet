@@ -284,8 +284,8 @@ function Entity:addComponentByReference(comp)
 			if k:match("^_") == nil and k ~= "requires" and k ~= "constructor"					-- don't include anything with _, requires, or anything already present.
 										and k ~= "destructor" and self[cName][k] == nil then 	-- or constructors or destructors 				
 				self[cName][k] = v 																-- add to the entity
-				if type(v) ~= "function" then 													-- if it is not a function 
-					self[cName][k] = self._eInfo.values[k] or v 								-- then the values override it.
+				if type(v) ~= "function" and self._eInfo.values[cName] ~= nil then 				-- if it is not a function and there is local data.
+					self[cName][k] = self._eInfo.values[cName][k] or v 							-- then the values override it.
 				end
 			end
 		end 
@@ -598,9 +598,6 @@ return Comet
 --- ************************************************************************************************************************************************************************
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
-
--- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
--- TODO Refresh documents - change for new initialiser.
 
 -- TODO Creating entities from a JSON 
 -- TODO Remove entity nulls everything ?

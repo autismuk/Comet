@@ -86,11 +86,13 @@ cm:newS("controller,velocity,speed", 															-- a system which sets veloc
 
 for i = 1,30 do 																				-- create some crabs that rotate, move and are controllable
 	e = cm:newE({c1,c3,"rotation","rotatespeed"},
-				{  }) e.__name = "e"..i
+				{ position = { x = math.random(display.contentWidth),y = math.random(display.contentHeight) },
+				  size = { width = 64,height = 64},
+				  velocity = { dx = math.random(32,128),dy = math.random(32,128)},
+				  speed = { speed = math.random(1,250)},
+				  rotatespeed = { da = math.random(-360,360) }
+				})
 	e:addC("controller,speed")
-	e.position.x = math.random(320) e.position.y = math.random(480)
-	e.velocity.dx = math.random(32,128) e.velocity.dy = math.random(32,160)
-	e.rotatespeed.da = math.random(-360,360) e.speed.speed = math.random(1,250)
 end
 
 cm:runAutomatic() 																				-- and let them go !
