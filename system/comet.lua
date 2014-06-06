@@ -276,14 +276,16 @@ end
 function Entity:addComponentByReference(comp)
 	if self._eInfo.components[comp] ~= nil then return end 										-- if it is already present, do nothing
 	--print("adding ",comp._cInfo.name)
+	local cName = comp._cInfo.name 																-- get component name
+	self[cName] = {} 																			-- initialise component store
 	local table = comp._cInfo.mixins 															-- work through the mixins
 	while table ~= nil do  																		-- until completed
 		for k,v in pairs(table) do  															-- work through this level mixins
 			if k:match("^_") == nil and k ~= "requires" and k ~= "constructor"					-- don't include anything with _, requires, or anything already present.
-												and k ~= "destructor" and self[k] == nil then 	-- or constructors or destructors 				
-				self[k] = v 																	-- add to the entity
+										and k ~= "destructor" and self[cName][k] == nil then 	-- or constructors or destructors 				
+				self[cName][k] = v 																-- add to the entity
 				if type(v) ~= "function" then 													-- if it is not a function 
-					self[k] = self._eInfo.values[k] or v 										-- then the values override it.
+					self[cName][k] = self._eInfo.values[k] or v 								-- then the values override it.
 				end
 			end
 		end 
@@ -589,6 +591,7 @@ return Comet
 -- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
 -- TODO Fix toString() for entity
 -- TODO Refresh documents - change for new initialiser.
+-- TODO Should removing components actually remove the data members ? (amend docs)
 
 -- TODO Creating entities from a JSON 
 -- TODO Remove entity nulls everything ?
