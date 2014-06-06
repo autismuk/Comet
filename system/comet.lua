@@ -603,12 +603,15 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
+-- TODO Update Documents to 4.1
 -- TODO Store members in a sub component
 -- TODO Remove instance specific data.
 -- TODO Remove member collision check, now not required.
 -- TODO Components must have proper names for access (lua compatible)
 -- TODO Update the main.lua
+
 -- TODO Creating entities from a JSON 
+-- TODO Synonym components ?
 -- TODO Collision (Rough)
 -- TODO ext to reserved words.
 -- TODO Timer Components, simple and complex.
