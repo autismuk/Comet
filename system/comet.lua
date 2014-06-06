@@ -604,13 +604,15 @@ return Comet
 --- ************************************************************************************************************************************************************************
 
 -- TODO Update Documents to 4.1
--- TODO Store members in a sub component
 -- TODO Remove instance specific data.
+-- TODO Store members in a sub component
 -- TODO Remove member collision check, now not required.
 -- TODO Components must have proper names for access (lua compatible)
 -- TODO Update the main.lua
 
 -- TODO Creating entities from a JSON 
+-- TODO Remove entity nulls everything ?
+-- TODO Nameable entities.
 -- TODO Synonym components ?
 -- TODO Collision (Rough)
 -- TODO ext to reserved words.
