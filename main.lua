@@ -85,9 +85,10 @@ cm:newS("controller,velocity,speed", 															-- a system which sets veloc
 
 
 for i = 1,30 do 																				-- create some crabs that rotate, move and are controllable
+	w = math.random(32,80)
 	e = cm:newE({c1,c3,"rotation","rotatespeed"},
 				{ position = { x = math.random(display.contentWidth),y = math.random(display.contentHeight) },
-				  size = { width = 64,height = 64},
+				  size = { width = w,height = w },
 				  velocity = { dx = math.random(32,128),dy = math.random(32,128)},
 				  speed = { speed = math.random(1,250)},
 				  rotatespeed = { da = math.random(-360,360) }
@@ -96,7 +97,6 @@ for i = 1,30 do 																				-- create some crabs that rotate, move and a
 end
 
 cm:runAutomatic() 																				-- and let them go !
-
 
 --cm:remove()
 --_G.Comet = Comet  require("bully")

@@ -45,7 +45,7 @@ function Comet:remove()
 	for _,system in pairs(self.systems) do system:remove() end 									-- remove all the systems.
 	self.components = nil self.queryCache = nil self.isAutomatic = nil 							-- tidy up.
 	self.entities = nil self.systems = nil self.systemInfo = nil self.terminate = nil
-	self.inUpdate = nil
+	self.inUpdate = nil self.lastUpdate = nil
 end 
 
 --//	Call methods on all systems in the Framework. This can be called automatically using the runAutomatic() method.
@@ -249,7 +249,7 @@ end
 --//	Remove the entity components and then mark as removed/
 
 function Entity:remove()
-	for _,comp in pairs(self._eInfo.components) do self:remComponentByReference(comp) end 		-- remove all components.
+	for _,comp in pairs(self._eInfo.components) do self:remComponentByReference(comp,true) end 	-- remove all components.
 	self._eInfo.comet.entities[self] = nil  													-- remove from comet entities list
 	self._eInfo = nil 																			-- remove eInfo to mark it dead.
 end 
@@ -303,14 +303,18 @@ end
 
 --//%	Remove a single component by reference
 --//	@comp 	[Component]		Component reference to remove
+--//	@enforce [boolean]		If true does not check that the component is required (for erasing entity, do not use normally)
 
-function Entity:remComponentByReference(comp)
+function Entity:remComponentByReference(comp,enforce)
 	assert(self._eInfo.components[comp] ~= nil,"Component not present in entity " .. comp._cInfo.name)
-	for _,component in pairs(self._eInfo.components) do 										-- for each component
-		if component ~= comp then  																-- if not the one being removed.
-			local requires = component._cInfo.requires 											-- get the requires
-			for i = 1,#requires do  															-- check that they are not needed.
-				assert(requires[i] ~= comp,component._cInfo.name .. " requires "..comp._cInfo.name .. " component")
+	enforce = enforce or false 																	-- enforce defaults to false.
+	if not enforce then 																		-- if not enforcing testing
+		for _,component in pairs(self._eInfo.components) do 									-- for each component
+			if component ~= comp then  															-- if not the one being removed.
+				local requires = component._cInfo.requires 										-- get the requires
+				for i = 1,#requires do  														-- check that they are not needed.
+					assert(requires[i] ~= comp,component._cInfo.name .. " requires "..comp._cInfo.name .. " component")
+				end
 			end
 		end
 	end
@@ -599,12 +603,11 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
--- TODO Creating entities from a JSON 
--- TODO Remove entity nulls everything ?
--- TODO Nameable entities.
--- TODO Synonym components ?
+-- TODO Creating entities from a JSON, returning a structure. 
+-- TODO Nameable entities ?
+-- TODO ext to reserved words (why ????)
 -- TODO Collision (Rough)
--- TODO ext to reserved words.
+-- TODO Synonym components ?
 -- TODO Timer Components, simple and complex.
 -- TODO Broadcast messaging system (listener)
 -- TODO Standard colour components, position, velocity, size, anchor , coronaobject
