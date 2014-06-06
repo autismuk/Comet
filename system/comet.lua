@@ -197,7 +197,7 @@ function Component:initialise(comet,name,def)
 	end 
 	def = def or {} 																			-- no actual definition is required for marker types
 	assert(name ~= nil and type(name) == "string" and type(def) == "table","Bad parameter") 	
-	assert(name:match("^[A-Za-z][A-Za-z0-9%_]*$") ~= nil,										-- check name of component is a legal lua identifier.
+	assert(name:match("^[a-z][a-z0-9%_]*$") ~= nil,												-- check name of component is a legal lua identifier and l/c
 							"Component name should be legal lua variable "..name)
 	name = name:lower() 																		-- name is case insensitive
 	assert(comet.components[name] == nil,"Duplicate component " .. name) 						-- check it doesn't already exist 
@@ -306,11 +306,20 @@ end
 
 function Entity:remComponentByReference(comp)
 	assert(self._eInfo.components[comp] ~= nil,"Component not present in entity " .. comp._cInfo.name)
+	for _,component in pairs(self._eInfo.components) do 										-- for each component
+		if component ~= comp then  																-- if not the one being removed.
+			local requires = component._cInfo.requires 											-- get the requires
+			for i = 1,#requires do  															-- check that they are not needed.
+				assert(requires[i] ~= comp,component._cInfo.name .. " requires "..comp._cInfo.name .. " component")
+			end
+		end
+	end
 	-- print("removing ",comp._cInfo.name)
 	if comp._cInfo.destructor ~= nil then self:executeMethod(comp._cInfo.destructor,comp) end 	-- call component destructor
 	self._eInfo.components[comp] = nil 															-- remove from components hash in entity
 	comp._cInfo.entities[self] = nil 															-- remove from entity hash in components
 	comp._cInfo.instanceCount = comp._cInfo.instanceCount - 1 									-- decrement instance count
+	self[comp._cInfo.name] = nil 																-- clear out members for this component.
 	local qc = self._eInfo.comet.queryCache 													-- access query cache
 	if qc ~= nil then qc:invalidate(comp) end 	 												-- invalidate any cache with this component
 end 
@@ -591,9 +600,6 @@ return Comet
 --- ************************************************************************************************************************************************************************
 
 -- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
--- DONE Fix toString() for entity (member dump ?)
--- TODO Should removing components actually remove the data members ? (amend docs)
--- TODO Component case issue - mandate LC ?
 -- TODO Refresh documents - change for new initialiser.
 
 -- TODO Creating entities from a JSON 
