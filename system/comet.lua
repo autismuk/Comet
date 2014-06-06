@@ -584,10 +584,6 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
--- DONE Update Documents to 4.1
--- DONE Remove member collision check, now not required.
--- DONE Remove private instance data
--- DONE Components must have proper names for access (lua compatible)
 -- TODO Store members in a sub component
 -- TODO Update the main.lua
 -- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
