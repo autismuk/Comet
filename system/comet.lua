@@ -367,7 +367,11 @@ end
 
 function Entity:toString()
 	local s = "[Entity] Ref:" .. tostring(self):sub(8) .. " Components:"
-	for _,comp in pairs(self._eInfo.components) do s = s .. comp._cInfo.name .. " " end
+	for _,comp in pairs(self._eInfo.components) do 
+		s = s .. comp._cInfo.name .. " [ " 
+		for k,v in pairs(self[comp._cInfo.name]) do s = s .. k .. "=" .. tostring(v) .. " " end
+		s = s .. "] "
+	end
 	return s
 end 
 
@@ -586,12 +590,11 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
--- TODO Store members in a sub component
--- TODO Update the main.lua
 -- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
--- TODO Fix toString() for entity
--- TODO Refresh documents - change for new initialiser.
+-- DONE Fix toString() for entity (member dump ?)
 -- TODO Should removing components actually remove the data members ? (amend docs)
+-- TODO Component case issue - mandate LC ?
+-- TODO Refresh documents - change for new initialiser.
 
 -- TODO Creating entities from a JSON 
 -- TODO Remove entity nulls everything ?

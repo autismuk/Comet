@@ -94,6 +94,7 @@ for i = 1,30 do 																				-- create some crabs that rotate, move and a
 end
 
 cm:runAutomatic() 																				-- and let them go !
+print(e:toString())
 --cm:remove()
 --_G.Comet = Comet  require("bully")
 -- TODO: Particle explosion on off left.
