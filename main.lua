@@ -25,7 +25,6 @@ c1 = cm:newC("sprite", { handle = nil, requires = { c0,c2 }, 									-- a crab 
 						 constructor = function(e) e.handle = display.newImage("images/crab.png") end,
 						 destructor = function(e) e.handle:removeSelf() end,
 })
-
 																								-- create some systems
 local s1 = cm:newS({c0,c1}, 																	-- position/sprite (moves it)
 		function (e) e.handle.x,e.handle.y = e.x,e.y end, { preProcess = function(el) end })
@@ -87,8 +86,11 @@ cm:newS("controller,velocity,speed", 															-- a system which sets veloc
 
 for i = 1,30 do 																				-- create some crabs that rotate, move and are controllable
 	local e = cm:newE({c1,c3,"rotation","rotatespeed"},
-				{ x = math.random(320),y = math.random(480),dx = math.random(32,128),dy = math.random(32,160),da = math.random(-360,360), speed = math.random(1,250) }) e.__name = "e"..i
+				{  }) e.__name = "e"..i
 	e:addC("controller,speed")
+	e.x = math.random(320) e.y = math.random(480)
+	e.dx = math.random(32,128) e.dy = math.random(32,160)
+	e.da = math.random(-360,360) e.speed = math.random(1,250)
 end
 
 

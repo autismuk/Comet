@@ -2,7 +2,7 @@
 --- ************************************************************************************************************************************************************************
 ---
 ---				Name : 		comet.lua
----				Purpose :	COMET (Component/Entity Framework for Corona/Lua), version 4
+---				Purpose :	COMET (Component/Entity Framework for Corona/Lua), version 4.1
 ---				Created:	3rd June 2014
 ---				Author:		Paul Robson (paul@robsons.org.uk)
 ---				License:	MIT
@@ -197,6 +197,8 @@ function Component:initialise(comet,name,def)
 	end 
 	def = def or {} 																			-- no actual definition is required for marker types
 	assert(name ~= nil and type(name) == "string" and type(def) == "table","Bad parameter") 	
+	assert(name:match("^[A-Za-z][A-Za-z0-9%_]*$") ~= nil,										-- check name of component is a legal lua identifier.
+							"Component name should be legal lua variable "..name)
 	name = name:lower() 																		-- name is case insensitive
 	assert(comet.components[name] == nil,"Duplicate component " .. name) 						-- check it doesn't already exist 
 	self._cInfo = { name = name, mixins = def, entities = {}, instanceCount = 0, 				-- this is the information that goes int e component
@@ -204,16 +206,6 @@ function Component:initialise(comet,name,def)
 	self._cInfo.constructor = def.constructor  													-- copy constructor, destructor, requires into the info structure.
 	self._cInfo.destructor = def.destructor 
 	self._cInfo.requires = comet:processComponentList(def.requires) 							-- create requires list entry.
-	for cname,ref in pairs(comet.components) do 												-- check through all known components
-		for key,value in pairs(def) do  														-- for every key,value members in the new mixin
-			if ref._cInfo.mixins[key] ~= nil then  												-- if that key is present in the known components mixins
-				if Component.reservedMixins[key] == nil then 									-- is it a reserved mixin - constructor, destructor etc.
-					print("Warning:Member "..key.." has been found in '"..						-- if not, then print a non-fatal warning.
-															name.."' and '"..cname.."'") 					
-				end
-			end
-		end
-	end
 	comet.components[name] = self 																-- store in the component hash, keyed on the name.
 end
 
@@ -350,17 +342,6 @@ end
 
 function Entity:getInfo() 
 	return self:getComet().systemInfo 															-- return system information (dt initially)
-end 
-
---//	Get a table to use for private storage for the component which is current.
---//	@return 	[table]			Private data store
-
-function Entity:getInstanceData() 
-	local comp = self._eInfo.currComponent 														-- access the current component
-	self._eInfo.privateStore = self._eInfo.privateStore or {} 									-- make sure the entity private store exists for this component
-	local ps = self._eInfo.privateStore  														-- short cut
-	ps[comp] = ps[comp] or {} 																	-- make sure the entity has private store for this component
-	return ps[comp]																				-- return it
 end 
 
 --//	Get a table to use for private storage which is shared amongst components.
@@ -603,12 +584,14 @@ return Comet
 --//	This is a class which instantiates standard components.
 --- ************************************************************************************************************************************************************************
 
--- TODO Update Documents to 4.1
--- TODO Remove instance specific data.
+-- DONE Update Documents to 4.1
+-- DONE Remove member collision check, now not required.
+-- DONE Remove private instance data
+-- DONE Components must have proper names for access (lua compatible)
 -- TODO Store members in a sub component
--- TODO Remove member collision check, now not required.
--- TODO Components must have proper names for access (lua compatible)
 -- TODO Update the main.lua
+-- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
+-- TODO Refresh documents - change for new initialiser.
 
 -- TODO Creating entities from a JSON 
 -- TODO Remove entity nulls everything ?
