@@ -587,6 +587,7 @@ return Comet
 -- TODO Store members in a sub component
 -- TODO Update the main.lua
 -- TODO Revamp initialisation stuff ? should now be { position = { x = 0, y = 0} } rather than { x = 0, y = 0 } and put initialiser back in.
+-- TODO Fix toString() for entity
 -- TODO Refresh documents - change for new initialiser.
 
 -- TODO Creating entities from a JSON 
